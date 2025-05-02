@@ -1,7 +1,7 @@
 import fitz
 import os
 import numpy as np
-import pandas.DataFrame as pd
+import pandas as pd
 from PIL import Image, ImageDraw
 import cv2
 from shapely.geometry import box
@@ -82,8 +82,10 @@ def extract_images_from_pdf(pdf_path: str, manual_id: int, output_dir: str, verb
                                        pg['page_number'], manual_id, meta)
     return meta
 
+
 def extract_page_number_from_filename(filename: str) -> str:
     return filename.split("_")[3] if "_" in filename else None
+
 
 def generate_image_table(documents_df: pd.DataFrame, sections_df: pd.DataFrame, image_dir: str, all_manuals_metadata: dict) -> pd.DataFrame:
     image_records = []

@@ -9,5 +9,7 @@ windows_credential_manager:
     account_identifier: "NC_Snowflake_Trial_Account_Name"
     "user_name": "NC_Snowflake_Trial_User_Name"
     "password": "NC_Snowflake_Trial_User_Password"
-    "database": "WASHING_MACHINE_MANUALS"
-    "schema"  : "PUBLIC"
+    
+snowflake:
+  "database": "WASHING_MACHINE_MANUALS"
+  "schema"  : "PUBLIC"
