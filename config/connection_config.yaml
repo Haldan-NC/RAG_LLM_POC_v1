@@ -1,0 +1,13 @@
+# Configuration file referencing Windows Credential Manager entries
+# Use a library like PyYAML to load this file, then use keyring.get_password(service, credential_name)
+# to retrieve each secret from Windows Credential Manager.
+
+windows_credential_manager:
+  openai:
+    api_key: "OpenAI_API_Key"
+  snowflake:
+    account_identifier: "NC_Snowflake_Trial_Account_Name"
+    "user_name": "NC_Snowflake_Trial_User_Name"
+    "password": "NC_Snowflake_Trial_User_Password"
+    "database": "WASHING_MACHINE_MANUALS"
+    "schema"  : "PUBLIC"

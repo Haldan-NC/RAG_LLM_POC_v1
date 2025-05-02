@@ -1,0 +1,14 @@
+keyring==25.6.0
+langchain==0.3.24
+langchain_community==0.3.23
+matplotlib==3.10.1
+numpy==2.2.5
+openai==1.76.2
+opencv_python==4.11.0.86
+opencv_python_headless==4.11.0.86
+pandas==2.2.3
+pdfplumber==0.11.6
+Pillow==11.2.1
+Shapely==2.1.0
+snowflake_connector_python==3.14.0
+tqdm==4.67.1

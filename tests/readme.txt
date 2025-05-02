@@ -1,0 +1,1 @@
+Tests directory is intended for pipelines to test RAG implmentations. These tests should be standardized such that we can compare performance of future branches with eachother before committing to new methods.
