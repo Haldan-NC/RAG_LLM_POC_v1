@@ -11,9 +11,9 @@ import pandas as pd
 import snowflake.connector as sf_connector
 from snowflake.connector.pandas_tools import write_pandas
 from src.utils.utils import get_config
+from src.ingestion.llm_functions.open_ai_llm_functions import extract_TOC_OpenAI
 from src.ingestion.image_extractor import extract_images_from_pdf, generate_image_table
 from src.ingestion.pdf_parser import extract_text_chunks
-
 
 
 def get_connection(account: str, user: str, password: str, database: str, schema: str):
@@ -154,7 +154,9 @@ def create_sections_table():
         cfg = get_config()
         database = cfg['snowflake']['database']
         schema = cfg['snowflake']['schema']
-        
+
+        sections_df = extract_TOC_OpenAI(documents_df, large_chunks_df, model ="OpenAI")
+
         cursor.execute("""
             CREATE OR REPLACE TABLE SECTIONS (
             SECTION_ID INT AUTOINCREMENT PRIMARY KEY,
@@ -169,8 +171,7 @@ def create_sections_table():
                 REFERENCES DOCUMENTS(DOCUMENT_ID)
         );
         """)
-
-        sections_df = create_TOC_table(documents_df, large_chunks_df, model ="OpenAI")
+        time.sleep(1)  # Sleep for 1 second to ensure the table is ready in snowflake.
 
         success, nchunks, nrows, output = write_pandas(
             conn=conn,
