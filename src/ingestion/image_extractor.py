@@ -17,7 +17,10 @@ def render_pdf_to_images(pdf_path: str, zoom: float = 2.0) -> list:
     Returns:
         list: List of dictionaries containing page number and image data.
     """
-    
+
+    cwd = os.getcwd()
+    pdf_path = os.path.join(cwd, pdf_path)
+
     doc = fitz.open(pdf_path)
     images = []
     for i,page in enumerate(doc):

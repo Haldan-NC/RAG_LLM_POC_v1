@@ -7,13 +7,12 @@ sys.path.append("..\\..\\..\\.")
 import pandas as pd
 from langchain.evaluation import load_evaluator
 
-from utils.open_ai_utils import get_openai_api_key, generate_promt_for_openai_api
-from utils.open_ai_utils import extract_json_from_open_ai_llm_output
+from src.utils.open_ai_utils import get_openai_api_key, generate_promt_for_openai_api
+from src.utils.open_ai_utils import extract_json_from_open_ai_llm_output
 
 
 
-
-def create_df_from_TOC_dict(toc_dict: dict, parent_section: str = None) -> list:
+def create_rows_from_TOC_dict(toc_dict: dict, parent_section: str = None) -> list:
     """
     This function takes a dictionary representing a table of contents and recursively traverses it to create a flat list of dictionaries.
     Each dictionary in the list represents a section of the table of contents, including its name, number, page, and parent section number.
@@ -50,10 +49,10 @@ def create_df_from_TOC_dict(toc_dict: dict, parent_section: str = None) -> list:
 
     # Recurse into each sub-section, if any
     for subsection in toc_dict.get("Sub Sections", []):
-        rows.extend(create_df_from_TOC_dict(subsection, parent_section=section_number))
-    toc_df = pd.DataFrame(rows)
+        print("Rows:", rows)
+        rows.extend(create_rows_from_TOC_dict(subsection, parent_section=section_number))
 
-    return toc_df
+    return rows
 
 
 def extract_TOC_OpenAI(text: str) -> pd.DataFrame:
@@ -97,7 +96,9 @@ def extract_TOC_OpenAI(text: str) -> pd.DataFrame:
                                             input_text = text)
 
     output_dict = extract_json_from_open_ai_llm_output(result.output_text)
-    toc_df = create_df_from_TOC_dict(output_dict)
+    toc_rows = create_rows_from_TOC_dict(output_dict)
+    toc_df = pd.DataFrame(toc_rows)
+
 
     return toc_df
 

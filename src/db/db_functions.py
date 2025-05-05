@@ -154,8 +154,27 @@ def create_sections_table():
         cfg = get_config()
         database = cfg['snowflake']['database']
         schema = cfg['snowflake']['schema']
+        sections_df_list = []
 
-        sections_df = extract_TOC_OpenAI(documents_df, large_chunks_df, model ="OpenAI")
+        documents_df = get_documents_table()
+
+        # No max columns for pandas 
+        pd.set_option('display.max_columns', None)
+
+        # Get the first chunk of each document
+        first_chunk_df = get_large_chunk_table().groupby("DOCUMENT_ID").first().reset_index()
+        for idx, row in tqdm(enumerate(first_chunk_df.iterrows()), total = len(first_chunk_df)):
+            chunk_text = row[1]["CHUNK_TEXT"]
+            local_sections_df = extract_TOC_OpenAI(chunk_text)
+            local_sections_df["DOCUMENT_ID"] = int(row[1]["DOCUMENT_ID"])
+            sections_df_list.append(local_sections_df.copy())
+
+        sections_df = pd.concat(sections_df_list, ignore_index=True)
+        sections_df["SECTION_NUMBER"] = sections_df["SECTION_NUMBER"].astype(str)
+        sections_df["PARENT_SECTION_NUMBER"] = sections_df["PARENT_SECTION_NUMBER"].astype(str)
+
+        print("sections_df:\n", sections_df)
+        print("")
 
         cursor.execute("""
             CREATE OR REPLACE TABLE SECTIONS (
@@ -163,16 +182,16 @@ def create_sections_table():
             DOCUMENT_ID INT NOT NULL,
             SECTION STRING NOT NULL,
             SECTION_NUMBER STRING NOT NULL,
-            PARENT_SECTION_NUMBER STRING,
             PAGE INT,
+            PARENT_SECTION_NUMBER STRING,
             CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
             CONSTRAINT fk_document
                 FOREIGN KEY (DOCUMENT_ID)
                 REFERENCES DOCUMENTS(DOCUMENT_ID)
         );
         """)
-        time.sleep(1)  # Sleep for 1 second to ensure the table is ready in snowflake.
 
+        time.sleep(2)  
         success, nchunks, nrows, output = write_pandas(
             conn=conn,
             df=sections_df,
@@ -190,7 +209,7 @@ def create_sections_table():
     return sections_df
 
 
-def create_images_table(image_source: str, image_dest: str) -> pd.DataFrame:
+def create_images_table(image_dest: str) -> pd.DataFrame:
 
     # Get db connection
     cfg = get_config()
@@ -198,12 +217,22 @@ def create_images_table(image_source: str, image_dest: str) -> pd.DataFrame:
     schema = cfg['snowflake']['schema']
     conn, cursor = get_cursor()
 
-    images_df = get_image_table()
+    images_df = get_images_table()
     if type(images_df) == pd.DataFrame:
         print("Image table already exists. No need to create it again.")
 
     else: 
-        # Create table for the images
+        documents_df = get_documents_table()
+        sections_df = get_sections_table()
+
+        all_manuals_metadata = {}
+        for idx,row in tqdm(enumerate(documents_df.iterrows()), total = len(documents_df)):
+            manual_id = row[1]["DOCUMENT_ID"]
+            file_path = row[1]["FILE_PATH"]
+            all_manuals_metadata[manual_id] = extract_images_from_pdf(file_path, manual_id, output_dir=image_dest, verbose = 0)
+            
+        images_df = generate_image_table(documents_df, sections_df, image_dest, all_manuals_metadata)
+
         cursor.execute("""
             CREATE OR REPLACE TABLE IMAGES (
             IMAGE_ID INT AUTOINCREMENT PRIMARY KEY,
@@ -233,15 +262,8 @@ def create_images_table(image_source: str, image_dest: str) -> pd.DataFrame:
                     REFERENCES SECTIONS(SECTION_ID)
         );
         """)
-        documents_df = get_table("DOCUMENTS")
-        all_manuals_metadata = {}
-        for idx,row in tqdm(enumerate(documents_df.iterrows()), total = len(documents_df)):
-            manual_id = row[1]["DOCUMENT_ID"]
-            file_path = row[1]["FILE_PATH"]
-            all_manuals_metadata[manual_id] = extract_images_from_pdf(file_path, manual_id, output_dir="Washer_Images", verbose = 0)
-            
-        images_df = generate_image_table(documents_df, sections_df, ".\\Washer_Images", all_manuals_metadata)
 
+        time.sleep(2)  
         success, nchunks, nrows, output = write_pandas(
             conn=conn,
             df=images_df,
@@ -252,8 +274,8 @@ def create_images_table(image_source: str, image_dest: str) -> pd.DataFrame:
             overwrite=False
         )
 
-        time.sleep(3) # Sleep for 3 seconds to ensure the table is ready in snowflake. We need to query the table to get the SECTION_ID
-        images_df = get_image_table()
+        time.sleep(2) # Sleep for 2 seconds to ensure the table is ready in snowflake. We need to query the table to get the SECTION_ID
+        images_df = get_images_table()
 
     return images_df
 
@@ -290,7 +312,7 @@ def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> 
     """
     chunks_df = get_table(table_name)
     if type(chunks_df) == pd.DataFrame:
-        print("Documents table already exists. No need to create it again.")
+        print(f"{table_name} table already exists. No need to create it again.")
     else:
 
         conn, cursor = get_cursor()

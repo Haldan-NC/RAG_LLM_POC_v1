@@ -1,6 +1,8 @@
 
 import sys
+sys.path.append(".")  
 sys.path.append("..\\.")  
+sys.path.append("..\\..\\.")  
 import yaml
 import keyring
 import pandas as pd
@@ -26,7 +28,8 @@ def create_washing_machine_schema_and_tables():
 
 
 def create_washing_machine_document_table():
-    pdf_files_path = "..\\data\\Washing_Machine_Data\\Documents"
+    # pdf_files_path = "..\\data\\Washing_Machine_Data\\Documents"
+    pdf_files_path = "data\\Washing_Machine_Data\\Documents"
     document_rows = []
     conn,cursor = get_cursor()
     
@@ -40,17 +43,10 @@ def create_washing_machine_document_table():
 
 
 def create_washing_machine_images_table():
-    pdf_source = "..\\data\\Washing_Machine_Data\\Documents"
-    image_dest = "..\\data\\Washing_Machine_Data\\images"
-    images_df = create_images_table(image_source, image_dest)
+    image_dest = "data\\Washing_Machine_Data\\Images"
+    images_df = create_images_table(image_dest)
 
     return images_df
-
-
-
-
-
-
 
 
 
@@ -69,4 +65,4 @@ if __name__ == "__main__":
     sections_df = create_sections_table()
 
     # Create Images table
-    
+    images_df = create_washing_machine_images_table()
