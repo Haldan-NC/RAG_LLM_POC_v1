@@ -14,21 +14,7 @@ from src.utils.utils import get_config
 from src.ingestion.llm_functions.open_ai_llm_functions import extract_TOC_OpenAI
 from src.ingestion.image_extractor import extract_images_from_pdf, generate_image_table
 from src.ingestion.pdf_parser import extract_text_chunks
-
-
-def get_connection(account: str, user: str, password: str, database: str, schema: str):
-    """
-    Returns a Snowflake connection and cursor. Used by setup and RAG client.
-    """
-    conn = sf_connector.connect(account=account,
-                                user=user, 
-                                password=password, 
-                                database=database,
-                                schema=schema,
-                                warehouse='COMPUTE_WH',
-                                role='ACCOUNTADMIN')
-    cursor = conn.cursor()
-    return conn, cursor
+from src.ingestion.llm_functions.open_ai_llm_functions import call_openai_api_for_image_description
 
 
 def get_cursor():
@@ -40,13 +26,21 @@ def get_cursor():
     cfg = get_config()
 
     # These credentials need to be polished up such that they fit with the actualt crednetial manager
-    acct = keyring.get_password(cfg['windows_credential_manager']['snowflake']['account_identifier'], 'account_identifier')
+    account = keyring.get_password(cfg['windows_credential_manager']['snowflake']['account_identifier'], 'account_identifier')
     user = keyring.get_password(cfg['windows_credential_manager']['snowflake']['user_name'], 'user_name')
-    pwd  = keyring.get_password(cfg['windows_credential_manager']['snowflake']['password'], 'password')
+    password  = keyring.get_password(cfg['windows_credential_manager']['snowflake']['password'], 'password')
     database = cfg['snowflake']['database']
     schema = cfg['snowflake']['schema']
 
-    conn, cursor = get_connection(acct, user, pwd, database, schema)
+    conn = sf_connector.connect(account=account,
+                                user=user, 
+                                password=password, 
+                                database=database,
+                                schema=schema,
+                                warehouse='COMPUTE_WH',
+                                role='ACCOUNTADMIN')
+    cursor = conn.cursor()
+
     return conn, cursor
 
 
@@ -112,7 +106,7 @@ def create_documents_table(pdf_files_path: str) -> pd.DataFrame:
                 document_rows.append({
                     "DOCUMENT_NAME": filename,
                     "FILE_PATH": file_path,
-                    "DOC_VERSION": "N/A",  # Placeholder, you can modify this logic as needed
+                    "DOC_VERSION": "N/A",  # Placeholder, you can modify this printic as needed
                     "FILE_SIZE": file_size
                 })
 
@@ -144,8 +138,7 @@ def create_documents_table(pdf_files_path: str) -> pd.DataFrame:
         documents_df = get_documents_table()
     return documents_df
 
-
-def create_sections_table():
+def create_sections_table() -> pd.DataFrame:
     sections_df = get_sections_table()
     if type(sections_df) == pd.DataFrame:
         print("Sections table already exists. No need to create it again.")
@@ -207,7 +200,6 @@ def create_sections_table():
         sections_df = get_sections_table()
 
     return sections_df
-
 
 def create_images_table(image_dest: str) -> pd.DataFrame:
 
@@ -279,8 +271,6 @@ def create_images_table(image_dest: str) -> pd.DataFrame:
 
     return images_df
 
-
-
 def create_chunked_tables() -> pd.DataFrame:
     """
     Creates CHUNKS_SMALL, and CHUNKS_LARGE tables in the database.
@@ -291,15 +281,13 @@ def create_chunked_tables() -> pd.DataFrame:
 
     return large_chunks_df, small_chunks_df
 
-
-def create_large_chunks_table() -> pd:
+def create_large_chunks_table() -> pd.DataFrame:
     return create_chunk_table("CHUNKS_LARGE", 7000, 128)
 
-def create_small_chunks_table() -> pd:
+def create_small_chunks_table() -> pd.DataFrame:
     return create_chunk_table("CHUNKS_SMALL", 1024, 64)
 
-
-def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> pd:
+def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> pd.DataFrame:
     """Method for creating a snowflake table for chunks.
     
     Args:
@@ -344,7 +332,7 @@ def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> 
                                 chunk_overlap = chunk_overlap)  # Show first 5 chunks
             chunks_df = pd.concat([chunks_df, tmp_chunked_df], ignore_index=True)
         
-            print("Writing the large chunks DataFrame to Snowflake")
+            print(f"Writing the {table_name} DataFrame to Snowflake")
             
         # Get Config    
         cfg = get_config()
@@ -362,7 +350,6 @@ def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> 
             auto_create_table=False,
             overwrite=False
         )
-        
         
         print(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}")
         time.sleep(2)
@@ -382,6 +369,70 @@ def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> 
     
     return chunks_df
 
+
+def populate_image_descriptions(images_df: pd.DataFrame) -> pd.DataFrame:
+    """ 
+    Populates the image descriptions in the images_df DataFrame using OpenAI API.
+    Args:
+        images_df (pd.DataFrame): DataFrame containing image information.
+    Returns:
+        pd.DataFrame: Updated DataFrame with image descriptions.
+    """
+
+    conn, cursor = get_cursor()
+
+    # Iterate through each image and generate a description using OpenAI API
+    # For each iteration, context of the image is required. I will use all small chunks of the page of the image, and the image itself.
+    for idx, row in images_df.iterrows():
+        if len(row["DESCRIPTION"]) > 0:
+            print(f"Image ID {row['IMAGE_ID']} already has a description. Skipping...")
+            continue # Skip if description already exists
+        print(f"Generating description for image ID {row['IMAGE_ID']}...")
+
+        file_location = row["IMAGE_PATH"]
+        page_number = row["PAGE"]
+        section_id = row["SECTION_ID"]
+        document_id = row["DOCUMENT_ID"]
+        image_id = row["IMAGE_ID"]
+
+        sql = f"""
+        SELECT * 
+        FROM CHUNKS_SMALL 
+        WHERE PAGE_START_NUMBER = %s AND DOCUMENT_ID = %s
+        """
+
+        # Important: pass input_text as a parameter, NOT interpolated directly
+        cursor.execute(sql, (page_number,document_id,))
+        local_small_chunks = cursor.fetch_pandas_all()
+
+        # Create a context string from the relevant chunks
+        context_string = "\n".join(local_small_chunks["CHUNK_TEXT"].tolist())
+        prompt = f"""
+            This image was extracted from the same page as the context string which is concatenated at the end of this string. 
+            Please describe the image in detail, including any relevant information that can be inferred from the context.
+
+            CONTEXT:
+            {context_string}
+            """
+
+        # Call OpenAI API to generate a description for the image
+        description_response = call_openai_api_for_image_description(file_location, prompt)
+        # print(f"Generated description for image ID:{image_id} {file_location}: {description_response}")
+
+        # Store the generated description in the DataFrame
+        images_df.at[idx, "DESCRIPTION"] = description_response
+        print(f"Updated IMAGE table for image ID:{image_id} with new description")
+
+        # Update the database with the new description
+        update_sql = f"""
+        UPDATE IMAGES
+        SET DESCRIPTION = %s
+        WHERE IMAGE_ID = %s
+        """
+        cursor.execute(update_sql, (description_response, image_id))
+        cursor.connection.commit()
+
+    return images_df
 
 
 if __name__ == "__main__":

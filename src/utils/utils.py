@@ -7,6 +7,7 @@ import os
 import yaml
 import keyring
 
+
 def traverse_project(pattern: str = '*'):
     """
     Yields all Path objects under your project root matching the glob pattern.
@@ -14,6 +15,7 @@ def traverse_project(pattern: str = '*'):
     """
     root = Path(__file__).resolve().parents[2]
     yield from root.rglob(pattern)
+
 
 def log(message: str, level: int = 1) -> None:
     """
@@ -24,11 +26,11 @@ def log(message: str, level: int = 1) -> None:
         ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         print(f"{ts} [LOG] {message}")
 
+
 def convert_to_abs_path(rel_path: str) -> str:
     """
     Helper to turn relative paths into absolute. Eases debugging when scanning files.
     """
-    import os
     return os.path.abspath(rel_path)
 
 

@@ -5,10 +5,12 @@ sys.path.append("..\\.")
 sys.path.append("..\\..\\.") 
 sys.path.append("..\\..\\..\\.") 
 import pandas as pd
+import base64
 from langchain.evaluation import load_evaluator
 
 from src.utils.open_ai_utils import get_openai_api_key, generate_promt_for_openai_api
 from src.utils.open_ai_utils import extract_json_from_open_ai_llm_output
+from src.utils.open_ai_utils import get_openai_client
 
 
 
@@ -101,6 +103,40 @@ def extract_TOC_OpenAI(text: str) -> pd.DataFrame:
 
 
     return toc_df
+
+
+def call_openai_api_for_image_description(file_path: str, prompt: str) -> str:
+    """
+    Calls OpenAI API to generate a description for the image using the provided context string.
+
+    Args:
+        file_uri (str): URI of the image file.
+        context_string (str): Context string for the image.
+
+    Returns:
+        str: Generated description for the image.
+    """
+
+    with open(file_path, "rb") as image_file:
+        b64_image = base64.b64encode(image_file.read()).decode("utf-8")
+
+    client = get_openai_client()
+
+    response = client.responses.create(
+        model="gpt-4o-mini",
+        input=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text":  prompt},
+                    {"type": "input_image", "image_url": f"data:image/png;base64,{b64_image}"}
+                ],
+            }
+        ],
+    )
+
+    return response.output_text
+
 
 
 

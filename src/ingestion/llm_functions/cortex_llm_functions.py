@@ -1,4 +1,83 @@
+import pandas as pd
+import time
+import sys
+sys.path.append(".")  
+sys.path.append("..\\.")  
+sys.path.append("..\\..\\.") 
 
+from src.db.db_functions import get_cursor
+
+
+def vector_embedding_cosine_similarity_search(input_text: str, chunk_size: str = "small") -> pd.DataFrame:
+    """
+    chunk_size: str = "small" or "large" - refers to the database table to search in.
+    Searches for similar chunks based on cosine similarity.
+    Returns a Pandas DataFrame with results.
+    """
+    if chunk_size == "small":
+        table_name = "CHUNKS_SMALL"
+    elif chunk_size == "large":
+        table_name = "CHUNKS_LARGE"
+    else:
+        raise ValueError("chunk_size must be 'small' or 'large'.")
+
+    conn,cursor = get_cursor()
+
+    sql = f"""
+    WITH input AS (
+        SELECT
+            SNOWFLAKE.CORTEX.EMBED_TEXT_1024('snowflake-arctic-embed-l-v2.0', %s) AS VECTOR
+        )
+        SELECT
+            document_id,
+            chunk_id,
+            CHUNK_ORDER,
+            PAGE_START_NUMBER,
+            PAGE_END_NUMBER,
+            chunk_text,
+            VECTOR_COSINE_SIMILARITY({table_name}.EMBEDDING, input.VECTOR) AS COSINE_SIMILARITY
+        FROM {table_name}, input
+        ORDER BY COSINE_SIMILARITY DESC
+        LIMIT 100
+    """
+
+    # Important: pass input_text as a parameter, NOT interpolated directly
+    cursor.execute(sql, (input_text,))
+    return_df = cursor.fetch_pandas_all()
+
+    return return_df
+
+
+
+def vector_embedding_cosine_similarity_between_texts(text1: str, text2: str) -> float:
+    """
+    Computes cosine similarity between two input texts using Snowflake Arctic Embedding.
+
+    Args:
+        text1 (str): First input text.
+        text2 (str): Second input text.
+        cursor: Snowflake database cursor.
+
+    Returns:
+        float: Cosine similarity between text1 and text2 (range -1 to 1).
+    """
+
+    conn,cursor = get_cursor()
+    sql = f"""
+    WITH embeddings AS (
+    SELECT 
+        SNOWFLAKE.CORTEX.EMBED_TEXT_1024('snowflake-arctic-embed-l-v2.0', %s) AS vector1,
+        SNOWFLAKE.CORTEX.EMBED_TEXT_1024('snowflake-arctic-embed-l-v2.0', %s) AS vector2
+    )
+    SELECT VECTOR_COSINE_SIMILARITY(vector1, vector2) AS cosine_similarity
+    FROM embeddings
+    """
+
+    cursor.execute(sql, (text1, text2))
+    result_df = cursor.fetch_pandas_all()
+
+    # Return the single float value
+    return result_df['COSINE_SIMILARITY'].iloc[0]
 
 
 

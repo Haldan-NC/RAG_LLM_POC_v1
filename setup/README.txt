@@ -1,1 +1,0 @@
-This readme should include everything that is required to know in order to setup a new database, or in order to connect to the database.
