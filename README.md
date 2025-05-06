@@ -8,39 +8,45 @@ This proof-of-concept establishes a structured foundation for ongoing developmen
 
 1. **Clone the repository**  
    ```bash
-   git clone <repo-url>
+   git clone https://github.com/Haldan-NC/RAG_LLM_POC_v1
    cd RAG_LLM_POC_v1
    ```
 2. **Install dependencies**  
    ```bash
    pip install -r requirements.txt
    ```
-3. **Do not alter** `connection_config.yaml` _(see section 3.5)_.  
+3. **Do not alter** `connection_config.yaml` _(see section 4)_.  
 4. **Setup credentials for Snowflake and OpenAI**  
    The codebase uses Python’s `keyring` library to interact with Windows Credential Manager. Follow the examples below:
 
-   **Example 1: Snowflake**  
+   **Snowflake Account Identifier:**  
    - In **Credential Manager → Windows Credentials → Add a generic credential**  
      - Internet or network address: `NC_Snowflake_Trial_Account_Name`  
      - User name: `account_identifier`  
-     - Password: `<your_snowflake_account_identifier>`
+     - Password: `<your snowflake account identifier: <Orginization Name>-<Account Name>>`
 
-   **Example 2: OpenAI**  
+   **Snowflake User Name:**  
+   - In **Credential Manager → Windows Credentials → Add a generic credential**  
+     - Internet or network address: `NC_Snowflake_Trial_User_Name`  
+     - User name: `user_name`  
+     - Password: `<your snowflake user name>`
+
+   **Snowflake Account Identifier:**  
+   - In **Credential Manager → Windows Credentials → Add a generic credential**  
+     - Internet or network address: `NC_Snowflake_Trial_User_Password`  
+     - User name: `password`  
+     - Password: `<your snowflake password>`
+
+   **OpenAI:**  
    - In **Credential Manager → Windows Credentials → Add a generic credential**  
      - Internet or network address: `OpenAI_API_Key`  
      - User name: `api_key`  
      - Password: `<your_openai_api_key>`
 
-5. **Initialize the database and tables**  
-   > _Must be run from the project root:_
-   ```bash
-   cd RAG_LLM_POC_v1
-   python setup/washing_machine_database_setup.py
-   ```
 
 ---
 
-### 2. Example Usage
+### 2. Example Usage and Database Setup
 
 1. **Create database and tables**  
    ```bash
@@ -53,19 +59,27 @@ This proof-of-concept establishes a structured foundation for ongoing developmen
    python src/rag/app.py
    ```
 
+3. **Run model evaluation**  
+   ```bash
+   cd RAG_LLM_POC_v1
+   python tests/T.B.D
+   ```
+
 ---
 
 ### 3. Project Structure
 
 ```text
 RAG_LLM_POC_v1/
+├── config/
+│   └── connection_config.yaml
 ├── docs/
 ├── setup/
-│   ├── README.txt
 │   └── washing_machine_database_setup.py
 ├── data/
-│   ├── [PDF files]
-│   └── [Extracted images]
+│   └── Washing_Machine_Data
+│       ├── Documents [PDF files]
+│       └── Images [Extracted images]
 ├── src/
 │   ├── db/
 │   │   └── db_functions.py
@@ -73,17 +87,18 @@ RAG_LLM_POC_v1/
 │   │   ├── image_extractor.py
 │   │   ├── pdf_parser.py
 │   │   └── llm_functions/
-│   │       └── [LLM-specific modules]
+│   │       ├── cortex_llm_functions.py
+│   │       └── openai_llm_functions.py
 │   ├── rag/
 │   │   ├── app.py
 │   │   ├── generator.py
 │   │   └── retriever.py
 │   └── utils/
-│       └── [Utility modules]
-├── tests/
-│   └── readme.txt
-└── config/
-    └── connection_config.yaml
+│       ├── cortex_utils.py
+│       ├── openai_utils.py
+│       └── utils.py
+└── tests/
+    └── readme.txt
 ```
 
 - **setup/**: Database-initialization scripts (currently for a washing-machine example; replace with Vestas data).  
@@ -93,4 +108,4 @@ RAG_LLM_POC_v1/
 - **src/rag/**: Retrieval-Augmented Generation pipeline entry point.  
 - **src/utils/**: Shared utility code.  
 - **tests/**: Test pipelines for performance and benchmarking.  
-- **config/**: Connection settings (e.g. `connection_config.yaml`), replaceable with Azure Key Vault or environment variables in the future.
+- **config/**: Connection files for windows credential manager (e.g. `connection_config.yaml`), replaceable with Azure Key Vault or environment variables in the future.
