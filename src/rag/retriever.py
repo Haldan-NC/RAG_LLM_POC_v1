@@ -1,11 +1,9 @@
-import sys
 import pandas as pd
-
+import sys
 sys.path.append("..\\.")  
 sys.path.append("..\\..\\.") 
 sys.path.append("..\\..\\..\\.") 
 from src.db.db_functions import get_cursor
-from src.ingestion.llm_functions.cortex_llm_functions import vector_embedding_cosine_similarity_search
 from src.ingestion.llm_functions.cortex_llm_functions import vector_embedding_cosine_similarity_between_texts
 
 

@@ -1,12 +1,5 @@
-import re
-import json
-import time
 from langchain_community.document_loaders import PDFPlumberLoader
 import pandas as pd
-from tqdm import tqdm
-from snowflake.connector.pandas_tools import write_pandas # (https://docs.snowflake.com/en/developer-guide/python-connector/python-connector-api#write_pandas)
-from src.utils.utils import get_config
-
 
 def extract_text_chunks(file_path: str, manual_id: int, chunk_size: int = 512, chunk_overlap: int = 128) -> pd.DataFrame:
     """

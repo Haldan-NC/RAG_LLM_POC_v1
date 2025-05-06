@@ -8,20 +8,12 @@ import yaml
 import keyring
 
 
-def traverse_project(pattern: str = '*'):
-    """
-    Yields all Path objects under your project root matching the glob pattern.
-    E.g. traverse_project('*.yaml') or traverse_project().
-    """
-    root = Path(__file__).resolve().parents[2]
-    yield from root.rglob(pattern)
-
-
 def log(message: str, level: int = 1) -> None:
     """
     Simple logger wrapper. `level` controls verbosity.
     Used across RAG and ingestion for debug prints.
     """
+    raise NotImplementedError("Logging is not implemented yet. This code serves as a placeholder until the log system in src/rag/app.py is replaced.")
     if level > 0:
         ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         print(f"{ts} [LOG] {message}")

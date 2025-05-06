@@ -41,7 +41,6 @@ def vector_embedding_cosine_similarity_search(input_text: str, chunk_size: str =
         LIMIT 100
     """
 
-    # Important: pass input_text as a parameter, NOT interpolated directly
     cursor.execute(sql, (input_text,))
     return_df = cursor.fetch_pandas_all()
 
@@ -76,9 +75,7 @@ def vector_embedding_cosine_similarity_between_texts(text1: str, text2: str) -> 
     cursor.execute(sql, (text1, text2))
     result_df = cursor.fetch_pandas_all()
 
-    # Return the single float value
     return result_df['COSINE_SIMILARITY'].iloc[0]
-
 
 
 
@@ -90,7 +87,7 @@ def extract_TOC_cortex(text: str, model : str = 'llama3.1-70b') -> str:
     NOTE: This function is not tested yet in this environment. It is a scaffolding code that worked in a notebook.
     """
 
-    raise NotImplementedError("Cortex Complete in this environemtn is not tested yet. This is purely scaffolding code that worked in a notebook.")
+    raise NotImplementedError("Cortex Complete in this environment is not tested yet. This is purely scaffolding code that worked in a notebook.")
     prompt = (
     f"""
     I will provide a long string of text that most likely contains a table of contents, 

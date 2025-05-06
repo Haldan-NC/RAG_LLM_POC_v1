@@ -17,7 +17,7 @@ from src.ingestion.pdf_parser import extract_text_chunks
 from src.ingestion.llm_functions.open_ai_llm_functions import call_openai_api_for_image_description
 
 
-def get_cursor():
+def get_cursor() -> [sf_connector, sf_connector.SnowflakeCursor]:
     """
     Returns Snowflake cursor (for RAG lookup). Called at start of RAG pipeline.
 
@@ -44,7 +44,7 @@ def get_cursor():
     return conn, cursor
 
 
-def get_table(table_name) -> Optional[pd]:
+def get_table(table_name: str) -> Optional[pd.DataFrame, None]:
     """SQL query execute for getting table
     
     Input:
@@ -202,8 +202,15 @@ def create_sections_table() -> pd.DataFrame:
     return sections_df
 
 def create_images_table(image_dest: str) -> pd.DataFrame:
+    """
+    Creates a Snowflake table of metadata for images. The table is created if it does not exist.
+    Args:
+        image_dest (str): Path to the directory where the extracted images are stored.
 
-    # Get db connection
+    Returns:
+        pd.DataFrame: DataFrame containing a pandas dataframe with the metadata for the images.
+    """
+
     cfg = get_config()
     database = cfg['snowflake']['database']
     schema = cfg['snowflake']['schema']
@@ -276,7 +283,6 @@ def create_chunked_tables() -> pd.DataFrame:
     Creates CHUNKS_SMALL, and CHUNKS_LARGE tables in the database.
     """
     large_chunks_df = create_large_chunks_table()
-    
     small_chunks_df = create_small_chunks_table()
 
     return large_chunks_df, small_chunks_df
@@ -382,7 +388,7 @@ def populate_image_descriptions(images_df: pd.DataFrame) -> pd.DataFrame:
     conn, cursor = get_cursor()
 
     # Iterate through each image and generate a description using OpenAI API
-    # For each iteration, context of the image is required. I will use all small chunks of the page of the image, and the image itself.
+    # For each iteration, context of the image is required. It will use all small chunks of the page of the image, and the image itself.
     for idx, row in images_df.iterrows():
         if len(row["DESCRIPTION"]) > 0:
             print(f"Image ID {row['IMAGE_ID']} already has a description. Skipping...")
@@ -417,7 +423,6 @@ def populate_image_descriptions(images_df: pd.DataFrame) -> pd.DataFrame:
 
         # Call OpenAI API to generate a description for the image
         description_response = call_openai_api_for_image_description(file_location, prompt)
-        # print(f"Generated description for image ID:{image_id} {file_location}: {description_response}")
 
         # Store the generated description in the DataFrame
         images_df.at[idx, "DESCRIPTION"] = description_response

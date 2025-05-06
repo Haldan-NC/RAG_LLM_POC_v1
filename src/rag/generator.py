@@ -1,5 +1,5 @@
-import sys
 import pandas as pd
+import sys
 sys.path.append("..\\.")  
 sys.path.append("..\\..\\.") 
 sys.path.append("..\\..\\..\\.") 
@@ -7,8 +7,6 @@ sys.path.append("..\\..\\..\\.")
 from src.db.db_functions import get_cursor
 from src.db.db_functions import populate_image_descriptions
 from src.utils.open_ai_utils import generate_promt_for_openai_api
-
-
 
 
 def add_image_references_to_guide(guide_text: str, filtered_task_chunk_df: pd.DataFrame) -> str:

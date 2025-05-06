@@ -1,48 +1,19 @@
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import keyring
-import os 
-import snowflake.connector as sf_connector # ( https://docs.snowflake.com/en/developer-guide/python-connector/python-connector-connect)
-from snowflake.connector.pandas_tools import write_pandas # (https://docs.snowflake.com/en/developer-guide/python-connector/python-connector-api#write_pandas)
-import pdfplumber
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PDFPlumberLoader
-from langchain.evaluation import load_evaluator
-from collections import defaultdict
-
-import numpy as np
-from tqdm import tqdm
 import time
-import re
-import json
-
-from io import BytesIO
-import fitz 
-from shapely.geometry import box
-from shapely.ops import unary_union
-from PIL import Image, ImageDraw
-import cv2
 from datetime import datetime
-
 
 # New imports
 import sys
 sys.path.append(".")  
 sys.path.append("..\\.")  
 sys.path.append("..\\..\\.") 
-from src.utils.utils import get_config
 from src.utils.open_ai_utils import generate_promt_for_openai_api
 from src.utils.open_ai_utils import extract_json_from_open_ai_llm_output
-from src.db.db_functions import get_cursor
 
 from src.ingestion.llm_functions.cortex_llm_functions import vector_embedding_cosine_similarity_search
-from src.ingestion.llm_functions.cortex_llm_functions import vector_embedding_cosine_similarity_between_texts
-from src.ingestion.llm_functions.open_ai_llm_functions import call_openai_api_for_image_description
 
 from src.rag.retriever import find_document_by_machine_name, narrow_down_relevant_chunks
 from src.rag.generator import add_image_references_to_guide
-from src.rag.generator import create_image_string_descriptors
 from src.rag.generator import create_step_by_step_prompt
 
 

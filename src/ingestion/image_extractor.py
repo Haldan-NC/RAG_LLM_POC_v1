@@ -6,6 +6,12 @@ from PIL import Image, ImageDraw
 import cv2
 from shapely.geometry import box
 from shapely.ops import unary_union
+import sys
+sys.path.append("..\\.")  
+sys.path.append("..\\..\\.") 
+sys.path.append("..\\..\\..\\.") 
+
+from src.utils.utils import convert_to_abs_path
 
 
 def render_pdf_to_images(pdf_path: str, zoom: float = 2.0) -> list:
@@ -18,8 +24,7 @@ def render_pdf_to_images(pdf_path: str, zoom: float = 2.0) -> list:
         list: List of dictionaries containing page number and image data.
     """
 
-    cwd = os.getcwd()
-    pdf_path = os.path.join(cwd, pdf_path)
+    pdf_path = convert_to_abs_path(pdf_path)
 
     doc = fitz.open(pdf_path)
     images = []
@@ -91,6 +96,17 @@ def extract_page_number_from_filename(filename: str) -> str:
 
 
 def generate_image_table(documents_df: pd.DataFrame, sections_df: pd.DataFrame, image_dir: str, all_manuals_metadata: dict) -> pd.DataFrame:
+    """
+    Generates a DataFrame of image metadata og images from the given directory and documents DataFrame.
+    Args:
+        documents_df (pd.DataFrame): DataFrame containing document metadata.
+        sections_df (pd.DataFrame): DataFrame containing section metadata.
+        image_dir (str): Directory containing images.
+        all_manuals_metadata (dict): Dictionary containing metadata for all manuals.
+    Returns:
+        pd.DataFrame: DataFrame containing image metadata.
+    """
+    
     image_records = []
 
     # Loop over all subdirectories in image_dir
@@ -122,6 +138,8 @@ def generate_image_table(documents_df: pd.DataFrame, sections_df: pd.DataFrame, 
             image_width, image_height = Image.open(image_path).size
             
             # Try to match to a section (same document, closest PAGE <= image page)
+            # This has room for improvement: we could use the image's coordinates to find the section more accurately
+            # but for now we just use the page number as we don't have the coordinates of sections in the sections_df
             section_match = None
             if page_number is not None:
                 matching_sections = sections_df[

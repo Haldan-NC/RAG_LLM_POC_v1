@@ -11,7 +11,14 @@ from src.db.db_functions import create_chunked_tables, create_sections_table, cr
 from src.utils.utils import get_config
 
 
-def create_washing_machine_schema_and_tables():
+def create_washing_machine_schema_and_tables() -> bool:
+    """
+    Create the database and schema for the washing machine data in Snowflake.
+    This function checks if the database and schema already exist, and if not, it creates them.
+    It also sets the current database and schema to the created ones.
+    Returns:
+        bool: True if the database and schema were created successfully, False otherwise.
+    """
     cfg = get_config()
     database = cfg['snowflake']['database']
     schema = cfg['snowflake']['schema']
@@ -27,8 +34,13 @@ def create_washing_machine_schema_and_tables():
         return False
 
 
-def create_washing_machine_document_table():
-    # pdf_files_path = "..\\data\\Washing_Machine_Data\\Documents"
+def create_washing_machine_document_table() -> pd.DataFrame:
+    """
+    Create the documents table for the washing machine data.
+
+    Returns:
+        pd.DataFrame: The documents DataFrame under the assumption the table was created successfully.
+    """
     pdf_files_path = "data\\Washing_Machine_Data\\Documents"
     document_rows = []
     conn,cursor = get_cursor()
@@ -42,7 +54,14 @@ def create_washing_machine_document_table():
     return documents_df
 
 
-def create_washing_machine_images_table():
+def create_washing_machine_images_table() -> pd.DataFrame:
+    """
+    Create the images table for the washing machine data.
+    Subprocesses include the extraction of images from the documents and the creation of the images table.
+    The images are extracted from the documents and stored in a local directory specified by image_dest.
+    Returns:
+        pd.DataFrame: _description_
+    """
     image_dest = "data\\Washing_Machine_Data\\Images"
     images_df = create_images_table(image_dest)
 

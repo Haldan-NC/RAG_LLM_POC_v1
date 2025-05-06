@@ -14,6 +14,7 @@ from src.utils.open_ai_utils import get_openai_client
 
 
 
+
 def create_rows_from_TOC_dict(toc_dict: dict, parent_section: str = None) -> list:
     """
     This function takes a dictionary representing a table of contents and recursively traverses it to create a flat list of dictionaries.

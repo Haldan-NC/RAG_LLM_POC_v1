@@ -1,16 +1,12 @@
+from openai import OpenAI
+import keyring
+import re
+import json
 import sys
 sys.path.append("..\\.")  
 sys.path.append("..\\..\\.") 
-from openai import OpenAI
-import base64
-import time 
-import keyring
-import os
-import re
-import json
 
 from src.utils.utils import get_config
-
 
 
 def get_openai_api_key() -> str:
