@@ -1,3 +1,4 @@
 data/Washing_Machine_Data/Images/
 /src/db/__pycache__
 /src/rag/__pycache__
+*.pyc
