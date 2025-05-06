@@ -2,6 +2,12 @@
 
 This proof-of-concept establishes a structured foundation for ongoing development, providing a modular codebase that invites focused, code-style contributions to individual components.
 
+#### The readme is structured as follows:
+#### 1. Installation
+#### 2. Example Usage and Database Setup
+#### 3. Project Structure
+
+
 ---
 
 ### 1. Installation
