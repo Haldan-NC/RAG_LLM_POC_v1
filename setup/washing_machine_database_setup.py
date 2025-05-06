@@ -8,7 +8,7 @@ import keyring
 import pandas as pd
 from src.db.db_functions import *
 from src.db.db_functions import create_chunked_tables, create_sections_table, create_images_table # Purely for the sake of readability
-from src.utils.utils import get_config
+from src.utils.utils import get_connection_config
 
 
 def create_washing_machine_schema_and_tables() -> bool:
@@ -19,7 +19,7 @@ def create_washing_machine_schema_and_tables() -> bool:
     Returns:
         bool: True if the database and schema were created successfully, False otherwise.
     """
-    cfg = get_config()
+    cfg = get_connection_config()
     database = cfg['snowflake']['database']
     schema = cfg['snowflake']['schema']
     conn, cursor = get_cursor()
@@ -47,7 +47,7 @@ def create_washing_machine_document_table() -> pd.DataFrame:
     
     documents_df = get_documents_table()
     if type(documents_df) == pd.DataFrame:
-        print("Documents table already exists. No need to create it again.")
+        log("Documents table already exists. No need to create it again.", level=1)
     else:
         documents_df = create_documents_table(pdf_files_path)
 

@@ -1,0 +1,4 @@
+# Verbosity levels have values 0, 1, or 2.
+# Verbosity levels will dictate the amount of terminal output will be displayed
+
+verbosity_level: 1

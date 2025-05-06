@@ -119,7 +119,7 @@ def generate_image_table(documents_df: pd.DataFrame, sections_df: pd.DataFrame, 
         # Match to document by DOCUMENT_NAME (strip extension if needed)
         matching_docs = documents_df[documents_df['DOCUMENT_NAME'].str.contains(subfolder, case=False)]
         if matching_docs.empty:
-            print(f"No matching document for subfolder: {subfolder}")
+            log(f"No matching document for subfolder: {subfolder}", level=1)
             continue
         
         document_id = matching_docs.iloc[0]['DOCUMENT_ID']
@@ -174,5 +174,4 @@ def generate_image_table(documents_df: pd.DataFrame, sections_df: pd.DataFrame, 
 
 
 if __name__ == "__main__":
-    print("")
-    # Test whether this script runs
+    pass   

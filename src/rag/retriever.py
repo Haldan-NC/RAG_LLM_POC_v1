@@ -26,31 +26,16 @@ def find_document_by_machine_name(machine_name: str) -> dict:
     """
     conn,cursor = get_cursor()
 
-    # 1. Retrieve all documents
     cursor.execute("""
         SELECT DOCUMENT_NAME, DOCUMENT_ID 
         FROM DOCUMENTS;
     """)
     documents_df = cursor.fetch_pandas_all()
     
-    # 2. Attempt to match using simple string matching (case insensitive)
     for _, row in documents_df.iterrows():
         doc_name = row['DOCUMENT_NAME']
         if machine_name.lower() in doc_name.lower() or doc_name.lower() in machine_name.lower():
             return {"DOCUMENT_NAME": doc_name, "DOCUMENT_ID": row["DOCUMENT_ID"]}
-    
-    # 3. If no string match was found, use cosine similarity via embeddings.
-    best_similarity = -1.0  # cosine similarity ranges from -1 to 1.
-    best_match = None
-    for _, row in documents_df.iterrows():
-        doc_name = row['DOCUMENT_NAME']
-        # Use the cosine_similarity_between_texts function to compute similarity.
-        similarity = vector_embedding_cosine_similarity_between_texts(machine_name, doc_name, cursor)
-        if similarity > best_similarity:
-            best_similarity = similarity
-            best_match = {"DOCUMENT_NAME": doc_name, "DOCUMENT_ID": row["DOCUMENT_ID"]}
-    
-    return best_match
 
 
 def narrow_down_relevant_chunks(task_chunk_df: pd.DataFrame, document_info: dict) -> pd.DataFrame:

@@ -11,6 +11,7 @@ from langchain.evaluation import load_evaluator
 from src.utils.open_ai_utils import get_openai_api_key, generate_promt_for_openai_api
 from src.utils.open_ai_utils import extract_json_from_open_ai_llm_output
 from src.utils.open_ai_utils import get_openai_client
+from src.utils.utils import log, log_execution_time
 
 
 
@@ -52,7 +53,7 @@ def create_rows_from_TOC_dict(toc_dict: dict, parent_section: str = None) -> lis
 
     # Recurse into each sub-section, if any
     for subsection in toc_dict.get("Sub Sections", []):
-        print("Rows:", rows)
+        log("Rows:", rows, level=1)
         rows.extend(create_rows_from_TOC_dict(subsection, parent_section=section_number))
 
     return rows
@@ -118,6 +119,7 @@ def call_openai_api_for_image_description(file_path: str, prompt: str) -> str:
         str: Generated description for the image.
     """
 
+    start_time = time.time()
     with open(file_path, "rb") as image_file:
         b64_image = base64.b64encode(image_file.read()).decode("utf-8")
 
@@ -135,6 +137,8 @@ def call_openai_api_for_image_description(file_path: str, prompt: str) -> str:
             }
         ],
     )
+
+    log_execution_time(time_start =start_time, description="OpenAI API call for (image+text)->text description using gpt-4o-mini", level=1)
 
     return response.output_text
 

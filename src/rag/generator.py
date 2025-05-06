@@ -7,6 +7,7 @@ sys.path.append("..\\..\\..\\.")
 from src.db.db_functions import get_cursor
 from src.db.db_functions import populate_image_descriptions
 from src.utils.open_ai_utils import generate_promt_for_openai_api
+from src.utils.utils import log
 
 
 def add_image_references_to_guide(guide_text: str, filtered_task_chunk_df: pd.DataFrame) -> str:
@@ -37,12 +38,12 @@ def add_image_references_to_guide(guide_text: str, filtered_task_chunk_df: pd.Da
     cursor.execute(sql, (document_id,))
     images_df = cursor.fetch_pandas_all()
 
-    print("Populating image descriptions if they don't exist...")
+    log("Populating image descriptions if they don't exist...", level=1)
     images_df = populate_image_descriptions(images_df)
 
     image_descriptors = create_image_string_descriptors(images_df)
     user_query = f"{guide_text} \n \n {image_descriptors}"
-    print("Calling OpenAI API to add image references to the guide...")
+    log("Calling OpenAI API to add image references to the guide...", level=1)
 
     response = generate_promt_for_openai_api(
         instructions="""

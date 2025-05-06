@@ -23,6 +23,8 @@ def vector_embedding_cosine_similarity_search(input_text: str, chunk_size: str =
 
     conn,cursor = get_cursor()
 
+    #To-Do: Include Document ID in the SQL query to limit the search to a set of specific documents.
+
     sql = f"""
     WITH input AS (
         SELECT
@@ -130,6 +132,6 @@ def extract_TOC_cortex(text: str, model : str = 'llama3.1-70b') -> str:
     result = cursor.execute(f"""
         SELECT SNOWFLAKE.CORTEX.COMPLETE('{model}', $$ {prompt} $$)
     """)
-    print(f"Runtime in seconds: {time.time() - start_time:.4f}")
+    log(f"Runtime in seconds: {time.time() - start_time:.4f}", level=1)
 
     return cursor.fetch_pandas_all().iloc[0,0]

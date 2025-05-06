@@ -2,18 +2,20 @@ from openai import OpenAI
 import keyring
 import re
 import json
+import time
 import sys
 sys.path.append("..\\.")  
 sys.path.append("..\\..\\.") 
 
-from src.utils.utils import get_config
+from src.utils.utils import get_connection_config
+from src.utils.utils import log, log_execution_time
 
 
 def get_openai_api_key() -> str:
     """
     Retrieves OpenAI API key from Windows Credential Manager.
     """
-    cfg = get_config()
+    cfg = get_connection_config()
     open_ai_api_key = keyring.get_password(cfg['windows_credential_manager']['openai']['api_key'], 'api_key')
     
     if open_ai_api_key is None:
@@ -32,12 +34,14 @@ def get_openai_client() -> OpenAI:
 
 
 def generate_promt_for_openai_api(instructions, input_text) -> str:
+    start_time = time.time()
     client = get_openai_client()
     response = client.responses.create(
         model="gpt-4o",
         instructions= instructions,
         input=input_text
     )
+    log_execution_time(time_start=start_time, description="OpenAI API call for text-text gpt-4o", level=1)
 
     return response
 
@@ -62,5 +66,5 @@ def extract_json_from_open_ai_llm_output(llm_output_text: str) -> dict:
         return parsed
 
     except Exception as e:
-        print("Failed to extract JSON:", e)
+        log(f"Failed to extract JSON: {e}", level=0)
         return {}

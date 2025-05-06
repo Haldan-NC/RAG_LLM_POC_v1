@@ -2,21 +2,29 @@ import sys
 sys.path.append("..\\.")  
 sys.path.append("..\\..\\.") 
 from datetime import datetime
-from pathlib import Path
+import time
 import os
 import yaml
 import keyring
 
 
-def log(message: str, level: int = 1) -> None:
+def log(message: str, level: int) -> None:
     """
     Simple logger wrapper. `level` controls verbosity.
     Used across RAG and ingestion for debug prints.
     """
-    raise NotImplementedError("Logging is not implemented yet. This code serves as a placeholder until the log system in src/rag/app.py is replaced.")
-    if level > 0:
-        ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        print(f"{ts} [LOG] {message}")
+    set_level = get_log_config()["verbosity_level"]
+    ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    if level <= set_level:
+        print(f"{ts} [LOG verbosity:{level}] {message}")
+
+def log_execution_time(time_start: int, description: str, level:int = 1) -> None:
+    """
+    Function to log the execution time of a function.
+    """
+    time_end = time.time()
+    log(f"{description} took {time_end - time_start:.2f} seconds", level=level)
 
 
 def convert_to_abs_path(rel_path: str) -> str:
@@ -26,8 +34,18 @@ def convert_to_abs_path(rel_path: str) -> str:
     return os.path.abspath(rel_path)
 
 
-def get_config():
+def get_connection_config():
     # Load config
     with open(os.path.join(os.path.dirname(__file__), '..\\..', 'config\\connection_config.yaml'), 'r') as f:
         cfg = yaml.safe_load(f)
     return cfg
+
+
+def get_log_config():
+    # Load config
+    with open(os.path.join(os.path.dirname(__file__), '..\\..', 'config\\log_config.yaml'), 'r') as f:
+        cfg = yaml.safe_load(f)
+    return cfg
+
+
+

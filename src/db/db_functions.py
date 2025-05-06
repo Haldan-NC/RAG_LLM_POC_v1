@@ -10,20 +10,20 @@ from tqdm import tqdm
 import pandas as pd
 import snowflake.connector as sf_connector
 from snowflake.connector.pandas_tools import write_pandas
-from src.utils.utils import get_config
+from src.utils.utils import get_connection_config, log
 from src.ingestion.llm_functions.open_ai_llm_functions import extract_TOC_OpenAI
 from src.ingestion.image_extractor import extract_images_from_pdf, generate_image_table
 from src.ingestion.pdf_parser import extract_text_chunks
 from src.ingestion.llm_functions.open_ai_llm_functions import call_openai_api_for_image_description
 
 
-def get_cursor() -> [sf_connector, sf_connector.SnowflakeCursor]:
+def get_cursor() -> [sf_connector, sf_connector.cursor]:
     """
     Returns Snowflake cursor (for RAG lookup). Called at start of RAG pipeline.
 
     Database and schema are hardcoded for now, but should be added to the config file.
     """
-    cfg = get_config()
+    cfg = get_connection_config()
 
     # These credentials need to be polished up such that they fit with the actualt crednetial manager
     account = keyring.get_password(cfg['windows_credential_manager']['snowflake']['account_identifier'], 'account_identifier')
@@ -44,7 +44,7 @@ def get_cursor() -> [sf_connector, sf_connector.SnowflakeCursor]:
     return conn, cursor
 
 
-def get_table(table_name: str) -> Optional[pd.DataFrame, None]:
+def get_table(table_name: str) -> pd.DataFrame | None:
     """SQL query execute for getting table
     
     Input:
@@ -58,7 +58,7 @@ def get_table(table_name: str) -> Optional[pd.DataFrame, None]:
         """)
         return cursor.fetch_pandas_all()
     except Exception as e:
-        print(f"Table {table_name} not found:")
+        log(f"Table {table_name} not found:", level=1)
         return None
 
 
@@ -88,19 +88,19 @@ def create_documents_table(pdf_files_path: str) -> pd.DataFrame:
     """
     document_rows = []
     conn, cursor = get_cursor()
-    cfg = get_config()
+    cfg = get_connection_config()
     database = cfg['snowflake']['database']
     schema = cfg['snowflake']['schema']
     documents_df = get_documents_table()
 
     if type(documents_df) == pd.DataFrame:
-        print("Documents table already exists. No need to create it again.")
+        log("Documents table already exists. No need to create it again.", level=1)
     else:
 
         for idx, filename in enumerate(os.listdir(pdf_files_path)):
             if filename.endswith(".pdf"):
                 file_path = os.path.join(pdf_files_path, filename)
-                print(f"Document number: {idx}  : {file_path}")
+                log(f"Document number: {idx}  : {file_path}", level=1)
                 file_size = os.path.getsize(file_path)
                 
                 document_rows.append({
@@ -132,19 +132,20 @@ def create_documents_table(pdf_files_path: str) -> pd.DataFrame:
             auto_create_table=False,
             overwrite=False
         )
-        print(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}")
+        log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}", level=1)
         time.sleep(2)  # Sleep for 3 seconds to ensure the table is ready in snowflake. We need to query the table to get the DOCUMENT_ID
 
         documents_df = get_documents_table()
     return documents_df
 
+
 def create_sections_table() -> pd.DataFrame:
     sections_df = get_sections_table()
     if type(sections_df) == pd.DataFrame:
-        print("Sections table already exists. No need to create it again.")
+        log("Sections table already exists. No need to create it again.", level=1)
     else:
         conn, cursor = get_cursor()
-        cfg = get_config()
+        cfg = get_connection_config()
         database = cfg['snowflake']['database']
         schema = cfg['snowflake']['schema']
         sections_df_list = []
@@ -166,8 +167,7 @@ def create_sections_table() -> pd.DataFrame:
         sections_df["SECTION_NUMBER"] = sections_df["SECTION_NUMBER"].astype(str)
         sections_df["PARENT_SECTION_NUMBER"] = sections_df["PARENT_SECTION_NUMBER"].astype(str)
 
-        print("sections_df:\n", sections_df)
-        print("")
+        log(f"sections_df:\n {sections_df}", level=1)
 
         cursor.execute("""
             CREATE OR REPLACE TABLE SECTIONS (
@@ -194,7 +194,7 @@ def create_sections_table() -> pd.DataFrame:
             auto_create_table=False,
             overwrite=False
         )
-        print(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}")
+        log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}", verbose=1)
 
         time.sleep(3) # Sleep for 3 seconds to ensure the table is ready in snowflake. We need to query the table to get the SECTION_ID
         sections_df = get_sections_table()
@@ -211,21 +211,21 @@ def create_images_table(image_dest: str) -> pd.DataFrame:
         pd.DataFrame: DataFrame containing a pandas dataframe with the metadata for the images.
     """
 
-    cfg = get_config()
+    cfg = get_connection_config()
     database = cfg['snowflake']['database']
     schema = cfg['snowflake']['schema']
     conn, cursor = get_cursor()
 
     images_df = get_images_table()
     if type(images_df) == pd.DataFrame:
-        print("Image table already exists. No need to create it again.")
+        log("Image table already exists. No need to create it again.", level=1)
 
     else: 
         documents_df = get_documents_table()
         sections_df = get_sections_table()
 
         all_manuals_metadata = {}
-        for idx,row in tqdm(enumerate(documents_df.iterrows()), total = len(documents_df)):
+        for idx,row in tqdm(enumerate(documents_df.iterrows()), total = len(documents_df), desc = f"Extracting images from {len(documents_df)} PDFs"):
             manual_id = row[1]["DOCUMENT_ID"]
             file_path = row[1]["FILE_PATH"]
             all_manuals_metadata[manual_id] = extract_images_from_pdf(file_path, manual_id, output_dir=image_dest, verbose = 0)
@@ -293,6 +293,7 @@ def create_large_chunks_table() -> pd.DataFrame:
 def create_small_chunks_table() -> pd.DataFrame:
     return create_chunk_table("CHUNKS_SMALL", 1024, 64)
 
+
 def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> pd.DataFrame:
     """Method for creating a snowflake table for chunks.
     
@@ -306,7 +307,7 @@ def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> 
     """
     chunks_df = get_table(table_name)
     if type(chunks_df) == pd.DataFrame:
-        print(f"{table_name} table already exists. No need to create it again.")
+        log(f"{table_name} table already exists. No need to create it again.", level=1)
     else:
 
         conn, cursor = get_cursor()
@@ -329,7 +330,7 @@ def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> 
         
         documents_df = get_documents_table()
         chunks_df = pd.DataFrame()
-        for row in tqdm(documents_df.iterrows(), total = len(documents_df)):
+        for row in tqdm(documents_df.iterrows(), total = len(documents_df), desc = f"Creating chunks for {table_name}"):
             manual_id = row[1]["DOCUMENT_ID"]
             file_path = row[1]["FILE_PATH"]
             tmp_chunked_df = extract_text_chunks(file_path = file_path,
@@ -338,10 +339,10 @@ def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> 
                                 chunk_overlap = chunk_overlap)  # Show first 5 chunks
             chunks_df = pd.concat([chunks_df, tmp_chunked_df], ignore_index=True)
         
-            print(f"Writing the {table_name} DataFrame to Snowflake")
+            log(f"Writing the {table_name} DataFrame to Snowflake", level=1)
             
         # Get Config    
-        cfg = get_config()
+        cfg = get_connection_config()
         database = cfg['snowflake']['database']
         schema = cfg['snowflake']['schema']
         
@@ -357,7 +358,7 @@ def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> 
             overwrite=False
         )
         
-        print(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}")
+        log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}", level=1)
         time.sleep(2)
 
         # Update the embeddings for the chunks in the CHUNKS_LARGE table
@@ -391,9 +392,9 @@ def populate_image_descriptions(images_df: pd.DataFrame) -> pd.DataFrame:
     # For each iteration, context of the image is required. It will use all small chunks of the page of the image, and the image itself.
     for idx, row in images_df.iterrows():
         if len(row["DESCRIPTION"]) > 0:
-            print(f"Image ID {row['IMAGE_ID']} already has a description. Skipping...")
+            log(f"Image ID {row['IMAGE_ID']} already has a description. Skipping...", level=1)
             continue # Skip if description already exists
-        print(f"Generating description for image ID {row['IMAGE_ID']}...")
+        log(f"Generating description for image ID {row['IMAGE_ID']}...", level=1)
 
         file_location = row["IMAGE_PATH"]
         page_number = row["PAGE"]
@@ -415,7 +416,8 @@ def populate_image_descriptions(images_df: pd.DataFrame) -> pd.DataFrame:
         context_string = "\n".join(local_small_chunks["CHUNK_TEXT"].tolist())
         prompt = f"""
             This image was extracted from the same page as the context string which is concatenated at the end of this string. 
-            Please describe the image in detail, including any relevant information that can be inferred from the context.
+            Please describe the image, including any relevant information that can be inferred from the context.
+            The description should be consise, information dense, and mostly relevant to the image rather than the parsed context.
 
             CONTEXT:
             {context_string}
@@ -426,7 +428,7 @@ def populate_image_descriptions(images_df: pd.DataFrame) -> pd.DataFrame:
 
         # Store the generated description in the DataFrame
         images_df.at[idx, "DESCRIPTION"] = description_response
-        print(f"Updated IMAGE table for image ID:{image_id} with new description")
+        log(f"Updated IMAGE table for image ID:{image_id} with new description", level=1)
 
         # Update the database with the new description
         update_sql = f"""
