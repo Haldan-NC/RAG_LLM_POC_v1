@@ -7,9 +7,9 @@ windows_credential_manager:
     api_key: "OpenAI_API_Key"
   snowflake:
     account_identifier: "NC_Snowflake_Trial_Account_Name"
-    "user_name": "NC_Snowflake_Trial_User_Name"
-    "password": "NC_Snowflake_Trial_User_Password"
+    user_name: "NC_Snowflake_Trial_User_Name"
+    password: "NC_Snowflake_Trial_User_Password"
     
 snowflake:
-  "database": "WASHING_MACHINE_MANUALS"
-  "schema"  : "PUBLIC"
+  database: "WASHING_MACHINE_MANUALS"
+  schema  : "PUBLIC"

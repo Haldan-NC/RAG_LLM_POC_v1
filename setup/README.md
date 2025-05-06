@@ -1,6 +1,5 @@
 ## This is a guide on how to set up the project locally.
 
-
 ## 1. Clone the repository
 
 ## 2. Install requirements.txt with pip
