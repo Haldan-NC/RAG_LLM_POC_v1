@@ -32,7 +32,7 @@ sys.path.append(".")
 sys.path.append("..\\.")  
 sys.path.append("..\\..\\.") 
 from src.utils.utils import get_config
-from src.utils.open_ai_utils import get_openai_api_key, generate_promt_for_openai_api
+from src.utils.open_ai_utils import generate_promt_for_openai_api
 from src.utils.open_ai_utils import extract_json_from_open_ai_llm_output
 from src.db.db_functions import get_cursor
 

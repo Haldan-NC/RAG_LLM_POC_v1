@@ -6,6 +6,8 @@ sys.path.append("..\\..\\..\\.")
 
 from src.db.db_functions import get_cursor
 from src.db.db_functions import populate_image_descriptions
+from src.utils.open_ai_utils import generate_promt_for_openai_api
+
 
 
 
