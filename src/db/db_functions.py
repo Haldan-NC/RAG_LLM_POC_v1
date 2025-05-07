@@ -1,4 +1,5 @@
 import sys
+sys.path.append(".")  
 sys.path.append("..\\.")  
 sys.path.append("..\\..\\.") 
 import os
@@ -29,8 +30,8 @@ def get_cursor() -> [sf_connector, sf_connector.cursor]:
     account = keyring.get_password(cfg['windows_credential_manager']['snowflake']['account_identifier'], 'account_identifier')
     user = keyring.get_password(cfg['windows_credential_manager']['snowflake']['user_name'], 'user_name')
     password  = keyring.get_password(cfg['windows_credential_manager']['snowflake']['password'], 'password')
-    database = cfg['snowflake']['database']
-    schema = cfg['snowflake']['schema']
+    database = cfg['snowflake']['vestas']['database']
+    schema = cfg['snowflake']['vestas']['schema']
 
     conn = sf_connector.connect(account=account,
                                 user=user, 
@@ -89,8 +90,8 @@ def create_documents_table(pdf_files_path: str) -> pd.DataFrame:
     document_rows = []
     conn, cursor = get_cursor()
     cfg = get_connection_config()
-    database = cfg['snowflake']['database']
-    schema = cfg['snowflake']['schema']
+    database = cfg['snowflake']['vestas']['database']
+    schema = cfg['snowflake']['vestas']['schema']
     documents_df = get_documents_table()
 
     if type(documents_df) == pd.DataFrame:
@@ -146,8 +147,8 @@ def create_sections_table() -> pd.DataFrame:
     else:
         conn, cursor = get_cursor()
         cfg = get_connection_config()
-        database = cfg['snowflake']['database']
-        schema = cfg['snowflake']['schema']
+        database = cfg['snowflake']['vestas']['database']
+        schema = cfg['snowflake']['vestas']['schema']
         sections_df_list = []
 
         documents_df = get_documents_table()
@@ -160,6 +161,9 @@ def create_sections_table() -> pd.DataFrame:
         for idx, row in tqdm(enumerate(first_chunk_df.iterrows()), total = len(first_chunk_df)):
             chunk_text = row[1]["CHUNK_TEXT"]
             local_sections_df = extract_TOC_OpenAI(chunk_text)
+            if local_sections_df is None:
+                log(f"Failed to extract sections from document_id {row[1]["DOCUMENT_ID"]}. Skipping...", level=1)
+                continue
             local_sections_df["DOCUMENT_ID"] = int(row[1]["DOCUMENT_ID"])
             sections_df_list.append(local_sections_df.copy())
 
@@ -201,6 +205,7 @@ def create_sections_table() -> pd.DataFrame:
 
     return sections_df
 
+
 def create_images_table(image_dest: str) -> pd.DataFrame:
     """
     Creates a Snowflake table of metadata for images. The table is created if it does not exist.
@@ -212,8 +217,8 @@ def create_images_table(image_dest: str) -> pd.DataFrame:
     """
 
     cfg = get_connection_config()
-    database = cfg['snowflake']['database']
-    schema = cfg['snowflake']['schema']
+    database = cfg['snowflake']['vestas']['database']
+    schema = cfg['snowflake']['vestas']['schema']
     conn, cursor = get_cursor()
 
     images_df = get_images_table()
@@ -222,7 +227,6 @@ def create_images_table(image_dest: str) -> pd.DataFrame:
 
     else: 
         documents_df = get_documents_table()
-        sections_df = get_sections_table()
 
         all_manuals_metadata = {}
         for idx,row in tqdm(enumerate(documents_df.iterrows()), total = len(documents_df), desc = f"Extracting images from {len(documents_df)} PDFs"):
@@ -230,14 +234,12 @@ def create_images_table(image_dest: str) -> pd.DataFrame:
             file_path = row[1]["FILE_PATH"]
             all_manuals_metadata[manual_id] = extract_images_from_pdf(file_path, manual_id, output_dir=image_dest, verbose = 0)
             
-        images_df = generate_image_table(documents_df, sections_df, image_dest, all_manuals_metadata)
+        images_df = generate_image_table(documents_df, image_dest, all_manuals_metadata)
 
         cursor.execute("""
             CREATE OR REPLACE TABLE IMAGES (
             IMAGE_ID INT AUTOINCREMENT PRIMARY KEY,
-            SECTION_ID INT NOT NULL,
             DOCUMENT_ID INT NOT NULL,
-            SECTION_NUMBER STRING NOT NULL,
             PAGE INT,
             IMG_ORDER INT,
             IMAGE_FILE STRING,
@@ -254,11 +256,8 @@ def create_images_table(image_dest: str) -> pd.DataFrame:
 
             CONSTRAINT fk_document
                 FOREIGN KEY (DOCUMENT_ID)
-                REFERENCES DOCUMENTS(DOCUMENT_ID),
+                REFERENCES DOCUMENTS(DOCUMENT_ID)
                 
-            CONSTRAINT fk_section
-                    FOREIGN KEY (SECTION_ID)
-                    REFERENCES SECTIONS(SECTION_ID)
         );
         """)
 
@@ -343,8 +342,8 @@ def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> 
             
         # Get Config    
         cfg = get_connection_config()
-        database = cfg['snowflake']['database']
-        schema = cfg['snowflake']['schema']
+        database = cfg['snowflake']['vestas']['database']
+        schema = cfg['snowflake']['vestas']['schema']
         
         
         # Write the DataFrame to Snowflake

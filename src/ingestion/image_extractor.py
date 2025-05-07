@@ -12,6 +12,7 @@ sys.path.append("..\\..\\.")
 sys.path.append("..\\..\\..\\.") 
 
 from src.utils.utils import convert_to_abs_path
+from src.utils.utils import log
 
 
 def render_pdf_to_images(pdf_path: str, zoom: float = 2.0) -> list:
@@ -95,12 +96,11 @@ def extract_page_number_from_filename(filename: str) -> str:
     return filename.split("_")[3] if "_" in filename else None
 
 
-def generate_image_table(documents_df: pd.DataFrame, sections_df: pd.DataFrame, image_dir: str, all_manuals_metadata: dict) -> pd.DataFrame:
+def generate_image_table(documents_df: pd.DataFrame, image_dir: str, all_manuals_metadata: dict) -> pd.DataFrame:
     """
     Generates a DataFrame of image metadata og images from the given directory and documents DataFrame.
     Args:
         documents_df (pd.DataFrame): DataFrame containing document metadata.
-        sections_df (pd.DataFrame): DataFrame containing section metadata.
         image_dir (str): Directory containing images.
         all_manuals_metadata (dict): Dictionary containing metadata for all manuals.
     Returns:
@@ -137,22 +137,8 @@ def generate_image_table(documents_df: pd.DataFrame, sections_df: pd.DataFrame, 
             image_size = os.path.getsize(image_path)
             image_width, image_height = Image.open(image_path).size
             
-            # Try to match to a section (same document, closest PAGE <= image page)
-            # This has room for improvement: we could use the image's coordinates to find the section more accurately
-            # but for now we just use the page number as we don't have the coordinates of sections in the sections_df
-            section_match = None
-            if page_number is not None:
-                matching_sections = sections_df[
-                    (sections_df['DOCUMENT_ID'] == document_id) & 
-                    (sections_df['PAGE'].astype(str) <= str(page_number))
-                ]
-                if not matching_sections.empty:
-                    section_match = matching_sections.sort_values("PAGE", ascending=False).iloc[0]
-            
             image_records.append({
                 "DOCUMENT_ID": document_id,
-                "SECTION_ID": section_match["SECTION_ID"] if section_match is not None else None,
-                "SECTION_NUMBER": section_match["SECTION_NUMBER"] if section_match is not None else None,
                 "PAGE": page_number,
                 "IMG_ORDER": order_number,
                 "IMAGE_FILE": image_file,

@@ -34,12 +34,14 @@ def main_RAG_pipeline(user_query: str, machine_name: str = "N/A" , verbose:int =
     log(f"Document Name: {document_info['DOCUMENT_NAME']}", level=1)
 
     log("Calling for Response 2: Finding most relevant chunks of data to solve the task...", level=1)
-    task_chunk_df = vector_embedding_cosine_similarity_search(input_text = task, chunk_size = "small")
+    task_chunk_df
 
     # Filtering the task_chunk_df to only include chunks related to the found document
     log(f"Pre - Filtered task chunk dataframe: {len(task_chunk_df)}", level=1)
     filtered_task_chunk_df = narrow_down_relevant_chunks(task_chunk_df, document_info)
     log(f"Post - Filtered task chunk dataframe: {len(filtered_task_chunk_df)}", level=1)
+
+    filtered_task_chunk_df.to_excel("filtered_task_chunk_df.xlsx", index=False)
 
     # Retrieving a step by step response from the LLM using the relevant chunks
     instructions_3, reference_text_3 = create_step_by_step_prompt(filtered_task_chunk_df, task)
@@ -70,6 +72,9 @@ if __name__ == "__main__":
 
     machine_name = "WGA1420SIN"
     user_query = f"There is often detergent residues on the laundry when i do a fine wash cycle. My washing machine model is {machine_name}. How can I fix this?" 
+
+    # machine_name = "WAN28282GC"
+    # user_query = f"My washing machine model is {machine_name}, and it's often making loud noises while washing. How can I fix this?" 
 
     main_RAG_pipeline(user_query, machine_name)
 

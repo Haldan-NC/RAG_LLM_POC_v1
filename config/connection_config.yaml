@@ -11,5 +11,9 @@ windows_credential_manager:
     password: "NC_Snowflake_Trial_User_Password"
     
 snowflake:
-  database: "WASHING_MACHINE_MANUALS"
-  schema  : "PUBLIC"
+  washing_machine:
+    database: "WASHING_MACHINE_MANUALS"
+    schema  : "PUBLIC"
+  vestas:
+    database: "VESTAS_MANUALS"
+    schema  : "PUBLIC"

@@ -11,7 +11,7 @@ from src.db.db_functions import create_chunked_tables, create_sections_table, cr
 from src.utils.utils import get_connection_config
 
 
-def create_washing_machine_schema_and_tables() -> bool:
+def create_vestas_schema_and_tables() -> bool:
     """
     Create the database and schema for the washing machine data in Snowflake.
     This function checks if the database and schema already exist, and if not, it creates them.
@@ -20,8 +20,8 @@ def create_washing_machine_schema_and_tables() -> bool:
         bool: True if the database and schema were created successfully, False otherwise.
     """
     cfg = get_connection_config()
-    database = cfg['washing_machine']['snowflake']['database']
-    schema = cfg['washing_machine']['snowflake']['schema']
+    database = cfg['snowflake']['vestas']['database']
+    schema = cfg['snowflake']['vestas']['schema']
     conn, cursor = get_cursor()
     
     try:
@@ -34,14 +34,14 @@ def create_washing_machine_schema_and_tables() -> bool:
         return False
 
 
-def create_washing_machine_document_table() -> pd.DataFrame:
+def create_vestas_document_table() -> pd.DataFrame:
     """
     Create the documents table for the washing machine data.
 
     Returns:
         pd.DataFrame: The documents DataFrame under the assumption the table was created successfully.
     """
-    pdf_files_path = "data\\Washing_Machine_Data\\Documents"
+    pdf_files_path = "data\\Vestas_RTP\\Documents"
     document_rows = []
     conn,cursor = get_cursor()
     
@@ -54,7 +54,7 @@ def create_washing_machine_document_table() -> pd.DataFrame:
     return documents_df
 
 
-def create_washing_machine_images_table() -> pd.DataFrame:
+def create_vestas_images_table() -> pd.DataFrame:
     """
     Create the images table for the washing machine data.
     Subprocesses include the extraction of images from the documents and the creation of the images table.
@@ -62,26 +62,42 @@ def create_washing_machine_images_table() -> pd.DataFrame:
     Returns:
         pd.DataFrame: _description_
     """
-    image_dest = "data\\Washing_Machine_Data\\Images"
+    image_dest = "data\\Vestas_RTP\\Images"
     images_df = create_images_table(image_dest)
 
     return images_df
+
+
+def create_vestas_sections_table() -> None:
+    """
+    This function is a placeholder for creating the sections table.
+    It is currently not implemented due to the variations in Vestas documents.
+    """
+
+    #The variations of Vestas documents create poor results in the current extraction method.", level=1)
+    log("The sections table will NOT be created in this version of the code!", level=1)
+    return NotImplemented
+
+    sections_df = create_sections_table()
+    return sections_df
 
 
 
 if __name__ == "__main__":
 
     # Creating the database and schema
-    create_washing_machine_schema_and_tables()
+    create_vestas_schema_and_tables()
 
     # Create a table for the documents
-    documents_df = create_washing_machine_document_table()
+    documents_df = create_vestas_document_table()
 
     # Create chunked tables
     large_chunks_df, small_chunks_df = create_chunked_tables()
 
-    # Create sections table
-    sections_df = create_sections_table()
+    # Create sections table (Not implemented for Vestas / Serves as a placeholder)
+    sections_df = create_vestas_sections_table()
 
     # Create Images table
-    images_df = create_washing_machine_images_table()
+    images_df = create_vestas_images_table()
+
+

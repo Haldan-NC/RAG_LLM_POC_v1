@@ -1,6 +1,7 @@
 import os 
 import time
 import sys
+sys.path.append(".")  
 sys.path.append("..\\.")  
 sys.path.append("..\\..\\.") 
 sys.path.append("..\\..\\..\\.") 
@@ -74,7 +75,7 @@ def create_rows_from_TOC_dict(toc_dict: dict, parent_section: str = None) -> lis
 
     # Recurse into each sub-section, if any
     for subsection in toc_dict.get("Sub Sections", []):
-        log("Rows:", rows, level=1)
+        log(f"Rows: {rows}", level=2)
         rows.extend(create_rows_from_TOC_dict(subsection, parent_section=section_number))
 
     return rows
@@ -124,6 +125,8 @@ def extract_TOC_OpenAI(text: str) -> pd.DataFrame:
     toc_rows = create_rows_from_TOC_dict(output_dict)
     toc_df = pd.DataFrame(toc_rows)
 
+    # DropnaN values in the dataframe. Sections with no parent sections have None replaced with "N/A".
+    toc_df = toc_df.dropna(inplace=True, how='all')
 
     return toc_df
 
