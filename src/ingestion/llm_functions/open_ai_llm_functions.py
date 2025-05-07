@@ -14,6 +14,27 @@ from src.utils.open_ai_utils import get_openai_client
 from src.utils.utils import log, log_execution_time
 
 
+def extract_task_and_machine_name(user_query: str, machine_name: str = "N/A") -> tuple:
+    log("Calling for Response 1: Extracting machine name and task...", level=1)
+    response_1 = generate_promt_for_openai_api(
+        instructions=f"""
+        Extract from the following user query:
+        1. The machine name or type. Let the key be "machine_name". If the user defined machine name is not "N/A", use that.
+        2. A one-sentence description of the task. Let the key be "task".
+
+        User defined machine name: {machine_name}
+
+        Return as JSON.
+        User query: 
+        """, 
+        input_text = user_query
+        )
+
+    response_1 = extract_json_from_open_ai_llm_output(response_1.output_text)
+    machine_name = response_1['machine_name']
+    task = response_1['task']
+
+    return task, machine_name
 
 
 def create_rows_from_TOC_dict(toc_dict: dict, parent_section: str = None) -> list:

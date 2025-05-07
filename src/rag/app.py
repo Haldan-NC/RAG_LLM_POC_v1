@@ -11,6 +11,7 @@ from src.utils.open_ai_utils import generate_promt_for_openai_api
 from src.utils.open_ai_utils import extract_json_from_open_ai_llm_output
 
 from src.ingestion.llm_functions.cortex_llm_functions import vector_embedding_cosine_similarity_search
+from src.ingestion.llm_functions.open_ai_llm_functions import extract_task_and_machine_name
 
 from src.rag.retriever import find_document_by_machine_name, narrow_down_relevant_chunks
 from src.rag.generator import add_image_references_to_guide
@@ -18,35 +19,20 @@ from src.rag.generator import create_step_by_step_prompt
 from src.utils.utils import log
 
 
+
 def main_RAG_pipeline(user_query: str, machine_name: str = "N/A" , verbose:int = 1) -> str:
     log("Starting RAG pipeline...", level=0)
     log(f"User query: {user_query}", level=1)
-    log("Calling for Response 1: Extracting machine name and task...", level=1)
-    response_1 = generate_promt_for_openai_api(
-        instructions=f"""
-        Extract from the following user query:
-        1. The machine name or type. Let the key be "machine_name". If the user defined machine name is not "N/A", use that.
-        2. A one-sentence description of the task. Let the key be "task".
-
-        User defined machine name: {machine_name}
-
-        Return as JSON.
-        User query: 
-        """, 
-        input_text = user_query
-        )
-
-    response_1 = extract_json_from_open_ai_llm_output(response_1.output_text)
-    machine_name = response_1['machine_name']
-    task = response_1['task']
+    
+    task, machine_name = extract_task_and_machine_name(user_query, machine_name)
     log(f"Extracted machine name: {machine_name}", level=1)
     log(f"Extracted task: {task}", level=1)
 
     log("Finding document ID in snowflake database...", level=1)
     document_info = find_document_by_machine_name(machine_name)
-
     log(f"Document ID: {document_info['DOCUMENT_ID']}", level=1)
     log(f"Document Name: {document_info['DOCUMENT_NAME']}", level=1)
+
     log("Calling for Response 2: Finding most relevant chunks of data to solve the task...", level=1)
     task_chunk_df = vector_embedding_cosine_similarity_search(input_text = task, chunk_size = "small")
 
@@ -55,7 +41,7 @@ def main_RAG_pipeline(user_query: str, machine_name: str = "N/A" , verbose:int =
     filtered_task_chunk_df = narrow_down_relevant_chunks(task_chunk_df, document_info)
     log(f"Post - Filtered task chunk dataframe: {len(filtered_task_chunk_df)}", level=1)
 
-    # Retrieve a step by step response from the LLM using the relevant chunks
+    # Retrieving a step by step response from the LLM using the relevant chunks
     instructions_3, reference_text_3 = create_step_by_step_prompt(filtered_task_chunk_df, task)
     log("Constructing instructions and reference text for Response 3 step by step guide using the relevant chunks...", level=1)
     log("Reference text:", level=2)
@@ -71,6 +57,7 @@ def main_RAG_pipeline(user_query: str, machine_name: str = "N/A" , verbose:int =
     log("Response 3:", level=2)
     log(response_3, level=2)
 
+    # Adding image references to the appropriate steps in the guide
     log("Calling for Response 4: Adding image references to the guide...", level=1)
     response_4 = add_image_references_to_guide(response_3, filtered_task_chunk_df)
     log("Response 4:", level=1)

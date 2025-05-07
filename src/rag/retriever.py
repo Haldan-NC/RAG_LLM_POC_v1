@@ -24,6 +24,7 @@ def find_document_by_machine_name(machine_name: str) -> dict:
         dict: A dictionary with keys "DOCUMENT_NAME" and "DOCUMENT_ID" corresponding
               to the best matching document.
     """
+
     conn,cursor = get_cursor()
 
     cursor.execute("""
