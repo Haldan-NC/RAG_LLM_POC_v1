@@ -6,9 +6,11 @@
 
 ## 3. Setup the credentials for Snowflake and OpenAI in the credential manager
 
-## 4. Run the following python script in the root directory of the project to set up the database and tables:
+## 4. Create a directory in "data" called "Vestas_RTP/Documents" and place the PDF files in there. Do not commit the PDF files to the repository.
+
+## 5. Run the following python script in the root directory of the project to set up the database and tables:
 
 ```bash
 cd "RAG_LLM_POC_v1" 
-python setup/setup.py
+python setup/vestas_database_setup.py
 ```

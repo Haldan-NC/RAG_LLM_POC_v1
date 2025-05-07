@@ -21,8 +21,24 @@ This proof-of-concept establishes a structured foundation for ongoing developmen
    ```bash
    pip install -r requirements.txt
    ```
-3. **Do not alter** `connection_config.yaml` _(see section 4)_.  
-4. **Setup credentials for Snowflake and OpenAI**  
+
+3. **Create a directory in `data` called `Vestas_RTP/Documents`**
+   - Place the PDF files in there.  
+   - **Do not commit the PDF files to the repository.**  
+   - The directory structure should look like this:  
+     ```text
+     RAG_LLM_POC_v1/
+     └── data/
+         └── Vestas_RTP/
+             └── Documents/
+                 ├── file1.pdf
+                 ├── file2.pdf
+                 └── ...
+     ```
+
+4. **Do not alter** `connection_config.yaml` _(see section 5)_.  
+
+5. **Setup credentials for Snowflake and OpenAI**  
    The codebase uses Python’s `keyring` library to interact with Windows Credential Manager. Follow the examples below:
 
    **Snowflake Account Identifier:**  
@@ -57,7 +73,7 @@ This proof-of-concept establishes a structured foundation for ongoing developmen
 1. **Create database and tables**  
    ```bash
    cd RAG_LLM_POC_v1
-   python setup/washing_machine_database_setup.py
+   python setup/vestas_database_setup.py
    ```
 2. **Run the RAG pipeline**  
    ```bash
@@ -78,11 +94,16 @@ This proof-of-concept establishes a structured foundation for ongoing developmen
 ```text
 RAG_LLM_POC_v1/
 ├── config/
-│   └── connection_config.yaml
+│   ├── connection_config.yaml
+│   └── log_config.yaml
 ├── docs/
 ├── setup/
-│   └── washing_machine_database_setup.py
+│   ├── washing_machine_database_setup.py
+│   └── vestas_database_setup.py
 ├── data/
+│   ├── Washing_Machine_Data
+│   │   ├── Documents [PDF files]
+│   │   └── Images [Extracted images]
 │   └── Washing_Machine_Data
 │       ├── Documents [PDF files]
 │       └── Images [Extracted images]
