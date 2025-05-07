@@ -8,7 +8,7 @@ sys.path.append("..\\..\\.")
 from src.db.db_functions import get_cursor
 
 
-def vector_embedding_cosine_similarity_search(input_text: str, chunk_size: str = "small") -> pd.DataFrame:
+def vector_embedding_cosine_similarity_search(input_text: str, chunk_size: str = "small", top_k:int = 100, similarity_threshold:float = 0.6) -> pd.DataFrame:
     """
     chunk_size: str = "small" or "large" - refers to the database table to search in.
     Searches for similar chunks based on cosine similarity.
@@ -39,8 +39,9 @@ def vector_embedding_cosine_similarity_search(input_text: str, chunk_size: str =
             chunk_text,
             VECTOR_COSINE_SIMILARITY({table_name}.EMBEDDING, input.VECTOR) AS COSINE_SIMILARITY
         FROM {table_name}, input
+        WHERE VECTOR_COSINE_SIMILARITY({table_name}.EMBEDDING, input.VECTOR) > {similarity_threshold}
         ORDER BY COSINE_SIMILARITY DESC
-        LIMIT 100
+        LIMIT {top_k}
     """
 
     cursor.execute(sql, (input_text,))

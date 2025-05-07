@@ -161,9 +161,6 @@ def create_sections_table() -> pd.DataFrame:
         for idx, row in tqdm(enumerate(first_chunk_df.iterrows()), total = len(first_chunk_df)):
             chunk_text = row[1]["CHUNK_TEXT"]
             local_sections_df = extract_TOC_OpenAI(chunk_text)
-            if local_sections_df is None:
-                log(f"Failed to extract sections from document_id {row[1]["DOCUMENT_ID"]}. Skipping...", level=1)
-                continue
             local_sections_df["DOCUMENT_ID"] = int(row[1]["DOCUMENT_ID"])
             sections_df_list.append(local_sections_df.copy())
 
@@ -204,7 +201,6 @@ def create_sections_table() -> pd.DataFrame:
         sections_df = get_sections_table()
 
     return sections_df
-
 
 def create_images_table(image_dest: str) -> pd.DataFrame:
     """
@@ -389,7 +385,7 @@ def populate_image_descriptions(images_df: pd.DataFrame) -> pd.DataFrame:
 
     # Iterate through each image and generate a description using OpenAI API
     # For each iteration, context of the image is required. It will use all small chunks of the page of the image, and the image itself.
-    for idx, row in images_df.iterrows():
+    for idx, row in tqdm(images_df.iterrows(), total=len(images_df), desc="Populating image descriptions"):
         if len(row["DESCRIPTION"]) > 0:
             log(f"Image ID {row['IMAGE_ID']} already has a description. Skipping...", level=1)
             continue # Skip if description already exists
@@ -397,7 +393,6 @@ def populate_image_descriptions(images_df: pd.DataFrame) -> pd.DataFrame:
 
         file_location = row["IMAGE_PATH"]
         page_number = row["PAGE"]
-        section_id = row["SECTION_ID"]
         document_id = row["DOCUMENT_ID"]
         image_id = row["IMAGE_ID"]
 

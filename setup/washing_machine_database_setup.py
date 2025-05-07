@@ -20,8 +20,8 @@ def create_washing_machine_schema_and_tables() -> bool:
         bool: True if the database and schema were created successfully, False otherwise.
     """
     cfg = get_connection_config()
-    database = cfg['washing_machine']['snowflake']['database']
-    schema = cfg['washing_machine']['snowflake']['schema']
+    database = cfg['snowflake']['washing_machine']['database']
+    schema = cfg['snowflake']['washing_machine']['schema']
     conn, cursor = get_cursor()
     
     try:
@@ -70,6 +70,8 @@ def create_washing_machine_images_table() -> pd.DataFrame:
 
 
 if __name__ == "__main__":
+
+    raise Exception("This script does not work anymore as the codebase has been restructured for Vestas. Use the Vestas database setup script instead.")
 
     # Creating the database and schema
     create_washing_machine_schema_and_tables()
