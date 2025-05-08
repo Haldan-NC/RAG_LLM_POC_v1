@@ -103,7 +103,7 @@ def create_documents_table(pdf_files_path: str) -> pd.DataFrame:
                 file_path = os.path.join(pdf_files_path, filename)
                 log(f"Document number: {idx}  : {file_path}", level=1)
                 file_size = os.path.getsize(file_path)
-                
+# Need to add meta-data here
                 document_rows.append({
                     "DOCUMENT_NAME": filename,
                     "FILE_PATH": file_path,

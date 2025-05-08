@@ -11,7 +11,6 @@ from src.db.db_functions import create_chunked_tables, create_sections_table, cr
 from src.utils.utils import get_connection_config
 
 
-
 def create_vestas_schema_and_tables() -> bool:
     """
     Create the database and schema for the washing machine data in Snowflake.
@@ -42,7 +41,7 @@ def create_vestas_document_table() -> pd.DataFrame:
     Returns:
         pd.DataFrame: The documents DataFrame under the assumption the table was created successfully.
     """
-    pdf_files_path = "data\\Vestas_RTP\\Documents"
+    pdf_files_path = "data\\Vestas_RTP\\Documents\\Documents"
     document_rows = []
     conn,cursor = get_cursor()
     
@@ -92,13 +91,13 @@ if __name__ == "__main__":
     # Create a table for the documents
     documents_df = create_vestas_document_table()
 
-    # Create chunked tables
-    large_chunks_df, small_chunks_df = create_chunked_tables()
+    # # Create chunked tables
+    # large_chunks_df, small_chunks_df = create_chunked_tables()
 
-    # Create sections table (Not implemented for Vestas / Serves as a placeholder)
-    sections_df = create_vestas_sections_table()
+    # # Create sections table (Not implemented for Vestas / Serves as a placeholder)
+    # sections_df = create_vestas_sections_table()
 
-    # Create Images table
-    images_df = create_vestas_images_table()
+    # # Create Images table
+    # images_df = create_vestas_images_table()
 
 
