@@ -11,6 +11,7 @@ from src.db.db_functions import create_chunked_tables, create_sections_table, cr
 from src.utils.utils import get_connection_config
 
 
+
 def create_vestas_schema_and_tables() -> bool:
     """
     Create the database and schema for the washing machine data in Snowflake.
