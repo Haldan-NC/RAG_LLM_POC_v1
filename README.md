@@ -23,7 +23,9 @@ This proof-of-concept establishes a structured foundation for ongoing developmen
    ```
 
 3. **Create a directory in `data` called `Vestas_RTP/Documents`**
-   - Place the PDF files in there.  
+   - Place "No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf" in there.  
+   - **Note:** The PDF files are not included in the repository.
+   - **Note:** The pipeline is currently only designed to work with the VGA guide! Using other documents will break the pipeline!
    - **Do not commit the PDF files to the repository.**  
    - The directory structure should look like this:  
      ```text
@@ -31,8 +33,7 @@ This proof-of-concept establishes a structured foundation for ongoing developmen
      └── data/
          └── Vestas_RTP/
              └── Documents/
-                 ├── file1.pdf
-                 ├── file2.pdf
+                 ├── No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf
                  └── ...
      ```
 
