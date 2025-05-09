@@ -81,6 +81,66 @@ def get_images_table() -> pd.DataFrame:
         return get_table("IMAGES")
 
 
+def write_to_table(df: pd.DataFrame, table_name: str) -> pd.DataFrame:
+    """
+    Appends a DataFrame to the Snowflake documents table.
+    Args:
+        df (pd.DataFrame): DataFrame to be appended.
+    Returns:
+        pd.DataFrame: Updated DataFrame containing the documents table.
+    """
+    conn, cursor = get_cursor()
+    cfg = get_connection_config()
+    database = cfg['snowflake']['vestas']['database']
+    schema = cfg['snowflake']['vestas']['schema']
+
+    success, nchunks, nrows, output = write_pandas(
+            conn=conn,
+            df=df,
+            database=database,
+            table_name=table_name,
+            schema=schema,
+            auto_create_table=False,
+            overwrite=False
+        )
+    log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}, Table Name: {table_name}", level=1)
+
+    # try:
+    #     success, nchunks, nrows, output = write_pandas(
+    #         conn=conn,
+    #         df=df,
+    #         database=database,
+    #         table_name=table_name,
+    #         schema=schema,
+    #         auto_create_table=False,
+    #         overwrite=False
+    #     )
+    #     log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}, Table Name: {table_name}", level=1)
+    # except Exception as e:
+    #     log(f"Table {table_name}, could not be written to:", level=1)
+    # finally:
+    #     conn.close()
+    
+
+def prepare_documents_df(pdf_files_path: list) -> pd.DataFrame:
+    document_rows = []
+    for idx, filename in enumerate(os.listdir(pdf_files_path)):
+        if filename.endswith(".pdf"):
+            file_path = os.path.join(pdf_files_path, filename)
+            log(f"Document number: {idx}  : {file_path}", level=1)
+            file_size = os.path.getsize(file_path)
+            
+            document_rows.append({
+                "DOCUMENT_NAME": filename,
+                "FILE_PATH": file_path,
+                "DOC_VERSION": "N/A",  # Placeholder, you can modify this printic as needed
+                "FILE_SIZE": file_size
+            })
+
+    documents_df = pd.DataFrame(document_rows)
+    return documents_df
+
+
 def create_documents_table(pdf_files_path: str) -> pd.DataFrame:
     """
     Creates a Snowflake table for documents. The table is created if it does not exist.
@@ -89,126 +149,91 @@ def create_documents_table(pdf_files_path: str) -> pd.DataFrame:
     Returns:
         pd.DataFrame: DataFrame containing the documents table.
     """
+
+    conn, cursor = get_cursor()
+    document_rows = []
+    cfg = get_connection_config()
+    database = cfg['snowflake']['vestas']['database']
+    schema = cfg['snowflake']['vestas']['schema']
+    
+    documents_df = prepare_documents_df(pdf_files_path)
+
+    try: 
+        cursor.execute("""
+            CREATE OR REPLACE TABLE DOCUMENTS (
+            DOCUMENT_ID INT AUTOINCREMENT PRIMARY KEY,
+            DOCUMENT_NAME STRING,
+            DOC_VERSION STRING,
+            FILE_PATH STRING NOT NULL,
+            FILE_SIZE NUMBER,
+            CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP()
+            );
+        """)
+        time.sleep(1) 
+        write_to_table(df = documents_df, table_name="DOCUMENTS")
+    except Exception as e:
+        log(f"Table DOCUMENTS, could not be created:", level=1)
+    finally:
+        conn.close()
     documents_df = get_documents_table()
-
-    if type(documents_df) == pd.DataFrame:
-        log("Documents table already exists. No need to create it again.", level=1)
-    else:
-        conn, cursor = get_cursor()
-        document_rows = []
-        cfg = get_connection_config()
-        database = cfg['snowflake']['vestas']['database']
-        schema = cfg['snowflake']['vestas']['schema']
-        
-        for idx, filename in enumerate(os.listdir(pdf_files_path)):
-            if filename.endswith(".pdf"):
-                file_path = os.path.join(pdf_files_path, filename)
-                log(f"Document number: {idx}  : {file_path}", level=1)
-                file_size = os.path.getsize(file_path)
-                
-                document_rows.append({
-                    "DOCUMENT_NAME": filename,
-                    "FILE_PATH": file_path,
-                    "DOC_VERSION": "N/A",  # Placeholder, you can modify this printic as needed
-                    "FILE_SIZE": file_size
-                })
-        try: 
-            cursor.execute("""
-                CREATE OR REPLACE TABLE DOCUMENTS (
-                DOCUMENT_ID INT AUTOINCREMENT PRIMARY KEY,
-                DOCUMENT_NAME STRING,
-                DOC_VERSION STRING,
-                FILE_PATH STRING NOT NULL,
-                FILE_SIZE NUMBER,
-                CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP()
-                );
-            """)
-            time.sleep(2)  # Sleep for 2 seconds to ensure the table is ready in snowflake. We need to query the table to get the DOCUMENT_ID
-
-            documents_df = pd.DataFrame(document_rows)
-            success, nchunks, nrows, output = write_pandas(
-                conn=conn,
-                df=documents_df,
-                database=database,
-                table_name="DOCUMENTS",
-                schema=schema,
-                auto_create_table=False,
-                overwrite=False
-            )
-            log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}", level=1)
-            time.sleep(2)  # Sleep for 3 seconds to ensure the table is ready in snowflake. We need to query the table to get the DOCUMENT_ID
-        except Exception as e:
-            log(f"Table DOCUMENTS, could not be created:", level=1)
-        finally:
-            conn.close()
-        documents_df = get_documents_table()
     return documents_df
 
 
 def create_sections_table() -> pd.DataFrame:
+    """
+    Old functions which worked with washing machine data. Requires a lot of polishing.
+    """
+
+    conn, cursor = get_cursor()
+    cfg = get_connection_config()
+    database = cfg['snowflake']['vestas']['database']
+    schema = cfg['snowflake']['vestas']['schema']
+    sections_df_list = []
+
+    documents_df = get_documents_table()
+
+    # No max columns for pandas 
+    pd.set_option('display.max_columns', None)
+
+    # Get the first chunk of each document
+    first_chunk_df = get_large_chunk_table().groupby("DOCUMENT_ID").first().reset_index()
+    for idx, row in tqdm(enumerate(first_chunk_df.iterrows()), total = len(first_chunk_df)):
+        chunk_text = row[1]["CHUNK_TEXT"]
+        local_sections_df = extract_TOC_OpenAI(chunk_text)
+        local_sections_df["DOCUMENT_ID"] = int(row[1]["DOCUMENT_ID"])
+        sections_df_list.append(local_sections_df.copy())
+
+    sections_df = pd.concat(sections_df_list, ignore_index=True)
+    sections_df["SECTION_NUMBER"] = sections_df["SECTION_NUMBER"].astype(str)
+    sections_df["PARENT_SECTION_NUMBER"] = sections_df["PARENT_SECTION_NUMBER"].astype(str)
+
+    log(f"sections_df:\n {sections_df}", level=1)
+    try: 
+        cursor.execute("""
+            CREATE OR REPLACE TABLE SECTIONS (
+            SECTION_ID INT AUTOINCREMENT PRIMARY KEY,
+            DOCUMENT_ID INT NOT NULL,
+            SECTION STRING NOT NULL,
+            SECTION_NUMBER STRING NOT NULL,
+            PAGE INT,
+            PARENT_SECTION_NUMBER STRING,
+            CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
+            CONSTRAINT fk_document
+                FOREIGN KEY (DOCUMENT_ID)
+                REFERENCES DOCUMENTS(DOCUMENT_ID)
+        );
+        """)
+
+        time.sleep(1)  
+        write_to_table(df = sections_df, table_name = "SECTIONS")
+    except Exception as e:
+        log("Table SECTIONS, could not be created", level=1)
+    finally:
+        conn.close()
     sections_df = get_sections_table()
-    if type(sections_df) == pd.DataFrame:
-        log("Sections table already exists. No need to create it again.", level=1)
-    else:
-        conn, cursor = get_cursor()
-        cfg = get_connection_config()
-        database = cfg['snowflake']['vestas']['database']
-        schema = cfg['snowflake']['vestas']['schema']
-        sections_df_list = []
-
-        documents_df = get_documents_table()
-
-        # No max columns for pandas 
-        pd.set_option('display.max_columns', None)
-
-        # Get the first chunk of each document
-        first_chunk_df = get_large_chunk_table().groupby("DOCUMENT_ID").first().reset_index()
-        for idx, row in tqdm(enumerate(first_chunk_df.iterrows()), total = len(first_chunk_df)):
-            chunk_text = row[1]["CHUNK_TEXT"]
-            local_sections_df = extract_TOC_OpenAI(chunk_text)
-            local_sections_df["DOCUMENT_ID"] = int(row[1]["DOCUMENT_ID"])
-            sections_df_list.append(local_sections_df.copy())
-
-        sections_df = pd.concat(sections_df_list, ignore_index=True)
-        sections_df["SECTION_NUMBER"] = sections_df["SECTION_NUMBER"].astype(str)
-        sections_df["PARENT_SECTION_NUMBER"] = sections_df["PARENT_SECTION_NUMBER"].astype(str)
-
-        log(f"sections_df:\n {sections_df}", level=1)
-        try: 
-            cursor.execute("""
-                CREATE OR REPLACE TABLE SECTIONS (
-                SECTION_ID INT AUTOINCREMENT PRIMARY KEY,
-                DOCUMENT_ID INT NOT NULL,
-                SECTION STRING NOT NULL,
-                SECTION_NUMBER STRING NOT NULL,
-                PAGE INT,
-                PARENT_SECTION_NUMBER STRING,
-                CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
-                CONSTRAINT fk_document
-                    FOREIGN KEY (DOCUMENT_ID)
-                    REFERENCES DOCUMENTS(DOCUMENT_ID)
-            );
-            """)
-
-            time.sleep(2)  
-            success, nchunks, nrows, output = write_pandas(
-                conn=conn,
-                df=sections_df,
-                database =database,
-                table_name="SECTIONS",
-                schema=schema,
-                auto_create_table=False,
-                overwrite=False
-            )
-            log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}", verbose=1)
-            time.sleep(3) # Sleep for 3 seconds to ensure the table is ready in snowflake. We need to query the table to get the SECTION_ID
-        except Exception as e:
-            log("Table SECTIONS, could not be created", level=1)
-        finally:
-            conn.close()
-        sections_df = get_sections_table()
 
     return sections_df
+
 
 def create_images_table(image_dest: str) -> pd.DataFrame:
     """
@@ -264,18 +289,8 @@ def create_images_table(image_dest: str) -> pd.DataFrame:
             );
             """)
 
-            time.sleep(2)  
-            success, nchunks, nrows, output = write_pandas(
-                conn=conn,
-                df=images_df,
-                database =database,
-                table_name="IMAGES",
-                schema=schema,
-                auto_create_table=False,
-                overwrite=False
-            )
-
-            time.sleep(2) # Sleep for 2 seconds to ensure the table is ready in snowflake. We need to query the table to get the SECTION_ID
+            time.sleep(1)  
+            write_to_table(df = images_df, table_name = "IMAGES")
             images_df = get_images_table()
         except Exception as e:
             log(f"Table IMAGES, could not be created:", level=1)
@@ -293,13 +308,13 @@ def create_chunked_tables() -> pd.DataFrame:
     return large_chunks_df, small_chunks_df
 
 def create_large_chunks_table() -> pd.DataFrame:
-    return create_chunk_table("CHUNKS_LARGE", 7000, 128)
+    return create_windowed_chunk_table("CHUNKS_LARGE", 7000, 128)
 
 def create_small_chunks_table() -> pd.DataFrame:
-    return create_chunk_table("CHUNKS_SMALL", 1024, 64)
+    return create_windowed_chunk_table("CHUNKS_SMALL", 1024, 64)
 
 
-def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> pd.DataFrame:
+def create_windowed_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> pd.DataFrame:
     """Method for creating a snowflake table for chunks.
     
     Args:
@@ -313,8 +328,8 @@ def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> 
     chunks_df = get_table(table_name)
     if type(chunks_df) == pd.DataFrame:
         log(f"{table_name} table already exists. No need to create it again.", level=1)
-    else:
 
+    else:
         conn, cursor = get_cursor()
         documents_df = get_documents_table()
         # Get Config    
@@ -337,9 +352,9 @@ def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> 
                 REFERENCES DOCUMENTS(DOCUMENT_ID)
         );
         """
+        cursor.execute(create_table_sql) # Creating the table without data
         try:
-            cursor.execute(create_table_sql)
-            
+        
             chunks_df = pd.DataFrame()
             for row in tqdm(documents_df.iterrows(), total = len(documents_df), desc = f"Creating chunks for {table_name}"):
                 manual_id = row[1]["DOCUMENT_ID"]
@@ -353,39 +368,129 @@ def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> 
                 log(f"Writing the {table_name} DataFrame to Snowflake", level=1)
             
             # Write the DataFrame to Snowflake
-            success, nchunks, nrows, output = write_pandas(
-                conn=conn,  # Convert conn, database objects to a object? 
-                df=chunks_df,
-                database =database,
-                table_name=table_name,
-                schema=schema,
-                auto_create_table=False,
-                overwrite=False
-            )
-            log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}", level=1)
-            time.sleep(2)
+            write_to_table(df = chunks_df, table_name = table_name)
         except Exception as e:
             log(f"Table {table_name}, could not be created:", level=1)
+            log(f"Exception: {e}:", level=1)
 
-        try:
-            # Update the embeddings for the chunks in the CHUNKS_LARGE table
-            cursor.execute(f"""
-                UPDATE {table_name}
-                SET EMBEDDING = SNOWFLAKE.CORTEX.EMBED_TEXT_1024(
-                    'snowflake-arctic-embed-l-v2.0',
-                    CHUNK_TEXT
-                )
-                WHERE EMBEDDING IS NULL;
-            """)
-
-            time.sleep(2)
-        except Exception as e:
-            log(f"Table {table_name}, could not be updated with EMBEDDING:", level=1)
-        finally:
-            conn.close()
+        # Add the embeddings to the chunks
+        create_embeddings_on_chunks(df = chunks_df, chunks_col = "CHUNK_TEXT", table_name = table_name)
         chunks_df = get_table(table_name)
+
     return chunks_df
 
+
+def create_embeddings_on_chunks(df: pd.DataFrame, chunks_col: str, table_name: str) -> bool:
+    conn, cursor = get_cursor()
+    try:
+        # Update the embeddings for the chunks in the CHUNKS_LARGE table
+        cursor.execute(f"""
+            UPDATE {table_name}
+            SET EMBEDDING = SNOWFLAKE.CORTEX.EMBED_TEXT_1024(
+                'snowflake-arctic-embed-l-v2.0',
+                {chunks_col}
+            )
+            WHERE EMBEDDING IS NULL;
+        """)
+        conn.close()
+        return True
+    except Exception as e:
+        log(f"Table {table_name}, could not be updated with EMBEDDING:", level=1)
+        conn.close()
+        return False
+
+
+def create_vga_guide_table() -> None:
+    try:
+        conn, cursor = get_cursor()
+        create_table_sql = f"""
+            CREATE OR REPLACE TABLE VGA_GUIDES (
+                GUIDE_ID INT AUTOINCREMENT PRIMARY KEY,
+                DOCUMENT_ID INT NOT NULL,
+                GUIDE_NUMBER INT NOT NULL,
+                PAGE_NUMBER INT,
+                GUIDE_NAME STRING NOT NULL,
+                STEPS INT,
+                TURBINE_MODELS STRING,
+                CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
+                CONSTRAINT fk_document
+                    FOREIGN KEY (DOCUMENT_ID)
+                    REFERENCES DOCUMENTS(DOCUMENT_ID)
+            );
+            """
+        cursor.execute(create_table_sql)
+    except Exception as e:
+        log(f"Table VGA_GUIDES, could not be created:", level=1)
+    conn.close()
+
+
+def create_vga_guide_steps_table() -> None:
+    """
+    Creates a Snowflake table for the steps in the guides. The table is created if it does not exist.
+    """
+    try:
+        conn, cursor = get_cursor()
+        create_table_sql = f"""
+            CREATE OR REPLACE TABLE VGA_GUIDE_STEPS (
+                GUIDE_STEP_ID INT AUTOINCREMENT PRIMARY KEY,
+                DOCUMENT_ID INT NOT NULL,
+                GUIDE_ID INT NOT NULL,
+                GUIDE_NUMBER INT NOT NULL,
+                PAGE_START INT,
+                PAGE_END INT,
+                STEP INT,
+                STEP_LABEL STRING,
+                TEXT STRING,
+                CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
+
+                CONSTRAINT fk_guide
+                    FOREIGN KEY (GUIDE_ID)
+                    REFERENCES VGA_GUIDES(GUIDE_ID),
+
+                CONSTRAINT fk_document
+                    FOREIGN KEY (DOCUMENT_ID)
+                    REFERENCES DOCUMENTS(DOCUMENT_ID)
+            );
+            """
+        cursor.execute(create_table_sql)
+    except Exception as e:
+        log(f"Table VGA_GUIDE_STEPS, could not be created:", level=1)
+    conn.close()
+
+
+def create_vga_guide_substeps_table() -> None:
+    """
+    Creates a Snowflake table for the steps in the guides. The table is created if it does not exist.
+    """
+    try:
+        conn, cursor = get_cursor()
+        create_table_sql = f"""
+            CREATE OR REPLACE TABLE VGA_GUIDE_SUBSTEPS (
+                GUIDE_SUBSTEP_ID INT AUTOINCREMENT PRIMARY KEY,
+                DOCUMENT_ID INT NOT NULL,
+                GUIDE_ID INT NOT NULL,
+                GUIDE_NUMBER INT NOT NULL,
+                PAGE_NUMBER INT,
+                STEP INT,
+                STEP_LABEL STRING,
+                TEXT STRING,
+                CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
+
+                CONSTRAINT fk_guide
+                    FOREIGN KEY (GUIDE_ID)
+                    REFERENCES VGA_GUIDES(GUIDE_ID),
+
+                CONSTRAINT fk_document
+                    FOREIGN KEY (DOCUMENT_ID)
+                    REFERENCES DOCUMENTS(DOCUMENT_ID)
+            );
+            """
+        cursor.execute(create_table_sql)
+    except Exception as e:
+        log(f"Table VGA_GUIDE_SUBSTEPS, could not be created:", level=1)
+    conn.close()
+
+    
 
 def populate_image_descriptions(images_df: pd.DataFrame) -> pd.DataFrame:
     """ 
