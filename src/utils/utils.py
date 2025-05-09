@@ -48,4 +48,16 @@ def get_log_config():
     return cfg
 
 
+class SuppressStderr:
+    """
+    A class to suppress stderr output found when parsing PDFs with pdfplumber.
+    Something in the lines of 'CropBox missing from /Page.'
+    """
+    def __enter__(self):
+        self._original_stderr = sys.stderr
+        sys.stderr = open(os.devnull, 'w')
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stderr.close()
+        sys.stderr = self._original_stderr
+
 

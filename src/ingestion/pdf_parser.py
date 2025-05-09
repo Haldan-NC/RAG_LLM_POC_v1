@@ -1,6 +1,7 @@
 from langchain_community.document_loaders import PDFPlumberLoader
 import pandas as pd
 
+
 def extract_text_chunks(file_path: str, manual_id: int, chunk_size: int = 512, chunk_overlap: int = 128) -> pd.DataFrame:
     """
     Extracts text chunks from a PDF file, tracking the page numbers and creating a DataFrame.
