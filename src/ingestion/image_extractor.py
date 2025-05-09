@@ -79,7 +79,7 @@ def crop_regions_from_image(page_image: Image.Image, regions: list, output_dir: 
     return metadata
 
 
-def extract_images_from_page(page: fitz.Page, page_num: int) -> list:
+def extract_images_from_page(page: fitz.Page, page_num: int, image_path: str) -> list:
     """
     Extracts images from a given page of a PDF document.
     The page object must be from pdfplumber. (import pdfplumber)
@@ -92,8 +92,13 @@ def extract_images_from_page(page: fitz.Page, page_num: int) -> list:
     """
     images = page.images
     images_path_list = []
+
+    image_path = image_path.replace(".pdf", "").replace("Documents\\VGA_guides", "Images")
+    if not os.path.exists(image_path):
+        os.makedirs(image_path, exist_ok=True)
+
     for i, img in enumerate(images):
-        image_dest = f"data/Vestas_RTP/Images/page_{page_num}_image_{i}.png"
+        image_dest = os.path.join(image_path, f"page_{page_num}_image_{i}.png")
         stream = img["stream"]
         image_bytes = stream.get_data()  # raw image bytes
         try:

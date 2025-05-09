@@ -19,6 +19,9 @@ sys.path.append("..\\..\\.")
 from src.utils.utils import get_connection_config, log
 from src.utils.utils import SuppressStderr
 from src.ingestion.image_extractor import extract_images_from_page
+from src.db.db_functions import prepare_documents_df, write_to_table, get_documents_table
+from src.db.db_functions import create_vga_guide_table, create_vga_guide_steps_table, create_vga_guide_substeps_table
+from src.db.db_functions import get_table
 
 
 def string_hardcoded_bandaid(text: str, real_page_num: int) -> str:
@@ -181,7 +184,7 @@ def add_explanation_to_guide(current_guide: dict, step_num: int, explanation: st
     return current_guide
 
 
-def extract_vga_guide(file_path: str) -> list:
+def extract_vga_guide(file_path: str, document_id: int) -> list:
     """
     Extracts the contant from the VGA guide and returns a dataframe with the content. 
     
@@ -211,13 +214,13 @@ def extract_vga_guide(file_path: str) -> list:
                 real_page_num = page_idx + 1
 
                 # Added to show some form of progress during extraction
-                if real_page_num% 150 == 0:
+                if (real_page_num% 150 == 0) or (real_page_num == len(pdf_document)):
                     log(f"  VGA guide extraction progress: {real_page_num}/{len(pdf_document)} pages", level = 1)
 
                 text = page.extract_text() or ""
                 tables = page.extract_tables()
 
-                images_list = extract_images_from_page(page = page, page_num = real_page_num)
+                images_list = extract_images_from_page(page = page, page_num = real_page_num, image_path = file_path)
 
                 # === Check for guide start ===
                 if "Guide Name" in text:
@@ -240,6 +243,8 @@ def extract_vga_guide(file_path: str) -> list:
                     table_of_interest = table_of_interest_index(real_page_num = real_page_num)
                     for table_idx,table in enumerate(tables): # We are only interested in the first table on the page
                         if table_of_interest == table_idx:
+
+                            # I will find a better solution than this loop in the future. Its very bad. 
                             if table[0][0] == "Error Text:": # skipping past this table.
                                 for i,__table in enumerate(tables):
                                     for j,row in enumerate(__table):
@@ -300,7 +305,183 @@ def extract_vga_guide(file_path: str) -> list:
         return guides
 
 
+def expand_mk_range(mk_str: str) -> list:
+    match = re.match(r'MK(\d+)-(\d+)', mk_str)
+    if match:
+        start, end = int(match.group(1)), int(match.group(2))
+        return [f'MK{i}' for i in range(start, end+1)]
+    else:
+        return [mk_str]
+
+def normalize_generator(g: str) -> str:
+    return g.replace(',', '.').strip()
+
+def extract_machines(s: str) -> set:
+    # Split string into segments ending in a generation spec
+    # Each segment should look like: "V105 V112 ... 3-4,2MW MK0-3"
+    segments = re.findall(r'(?:V\d+\s+)+(?:[\d.,/-]+MW)\s+MK[\d\-]+', s)
+
+    machines = set()
+
+    for segment in segments:
+        frames = re.findall(r'\bV\d+\b', segment)
+        generator = re.search(r'[\d.,/-]+MW', segment)
+        mk_match = re.search(r'MK[\d\-]+', segment)
+
+        if not (frames and generator and mk_match):
+            continue
+
+        generator_str = normalize_generator(generator.group())
+        generations = expand_mk_range(mk_match.group())
+
+        for frame in frames:
+            for mk in generations:
+                # add a string to the set
+                machines.add(f"{frame} {generator_str} {mk}")
+
+    return sorted(machines)
+
+
+def append_vga_guide_to_documents_table() -> pd.DataFrame:
+    """
+    Adds the VGA guide to the documents table in Snowflake.
+    This is seperate from the main ingenstion process as the VGA guide is a special case in a seperate directory.
+
+    """
+
+    pdf_files_path = "data\\Vestas_RTP\\Documents\\VGA_guides\\"
+    documents_df = prepare_documents_df(pdf_files_path = pdf_files_path)
+    write_to_table(df = documents_df, table_name="DOCUMENTS")
+    documents_df = get_documents_table()
+
+    return documents_df
+
+
+def extract_guide_name_from_text(text: str) -> str:
+    """
+    Extracts the guide name from the text.
+    The guide name is the first line of the text.
+    """
+    return text.replace("Guide Name: ", "").strip().split("\n")[0]
+
+
+def create_vga_guide_dataframe(guides: list, document_id: int) -> pd.DataFrame:
+    guides_df = pd.DataFrame(guides)
+    guides_df["steps"] = [len(guides[i]['steps']) for i in range(len(guides))]
+    guides_df.reset_index(inplace=True)
+    guides_df.rename(columns={"text": "GUIDE_NAME", "page_number": "PAGE_NUMBER", "steps":"STEPS", "index": "GUIDE_NUMBER"}, inplace=True)
+    guides_df["GUIDE_NAME"] = [extract_guide_name_from_text(text) for text in guides_df["GUIDE_NAME"]]
+    guides_df["TURBINE_MODELS"] = ""
+
+    all_machines = set()
+    for i, example in enumerate(guides_df["GUIDE_NAME"].copy()):
+        machines = extract_machines(example)
+        for m in machines:
+            all_machines.add(m)
+        guides_df.at[i, "TURBINE_MODELS"] = " | ".join(machines)
+    guides_df["DOCUMENT_ID"] = document_id
+    return guides_df
+
+
+def find_guide_ID_from_name(guides_df: pd.DataFrame, guide_name: str) -> int:
+    """
+    Finds the guide ID from the guide name.
+    The guide ID is the index of the guide in the guides_df dataframe.
+    """
+    for i, row in guides_df.iterrows():
+        if row["GUIDE_NAME"] == guide_name:
+            return row["GUIDE_ID"]
+    return None
+
+
+def create_vga_guide_steps_dataframe(guides: list, guides_df: pd.DataFrame) -> pd.DataFrame:
+    combined_steps_rows = []
+    document_id = guides_df["DOCUMENT_ID"].iloc[0]
+
+    for g_idx,guide in enumerate(guides):
+
+        guide_id = find_guide_ID_from_name(guides_df = guides_df, 
+                guide_name = extract_guide_name_from_text(guide["text"]))
+
+        row_dict = {
+                "DOCUMENT_ID": document_id,
+                "GUIDE_ID": guide_id,
+                "GUIDE_NUMBER": g_idx,
+                "PAGE_START": guide["page_number"],
+                "PAGE_END": guide["page_number"],
+                "STEP": 0,
+                "STEP_LABEL": "Guide Overview",
+                "TEXT": guide['text']
+            }
+        # Adding the overview text as a row as it might contain useful information
+        combined_steps_rows.append(row_dict)
+        
+        for s_idx, step in enumerate(guide["steps"]):
+            combined_explanation = ""
+            page_end = 0
+            for ex_idx, explanation in enumerate(guide["steps"][step]["explanation"]):
+                combined_explanation += explanation + " "
+                if ex_idx == 0:
+                    page_start = 0
+                elif ex_idx == len(guide["steps"][step]["explanation"]) - 1:
+                    page_end = guide["steps"][step]["page_number"][ex_idx]
+
+            row_dict = {
+                "DOCUMENT_ID": document_id,
+                "GUIDE_ID": guide_id,
+                "GUIDE_NUMBER": g_idx,
+                "PAGE_START": guide["steps"][step]["page_number"][0],
+                "PAGE_END": guide["steps"][step]["page_number"][ex_idx],
+                "STEP": step,
+                "STEP_LABEL": guide["steps"][step]["step_label"],
+                "TEXT": guide["steps"][step]["explanation"][ex_idx]
+            }
+            # Adding each Step and Explaination as a row
+            combined_steps_rows.append(row_dict)
+
+    combined_steps_df = pd.DataFrame(combined_steps_rows)
+    return combined_steps_df
+    
+
+def create_vga_guide_substeps_dataframe(guides: list, guides_df: pd.DataFrame) -> pd.DataFrame:
+    substeps_rows = []
+    document_id = guides_df["DOCUMENT_ID"].iloc[0]
+
+    for g_idx,guide in enumerate(guides):
+
+        guide_id = find_guide_ID_from_name(guides_df = guides_df, 
+                guide_name = extract_guide_name_from_text(guide["text"]))
+
+        row_dict = {
+                "DOCUMENT_ID": document_id,
+                "GUIDE_ID": guide_id,
+                "GUIDE_NUMBER": g_idx,
+                "PAGE_NUMBER": guide["page_number"],
+                "STEP": 0,
+                "STEP_LABEL": "Guide Overview",
+                "TEXT": guide['text'],
+            }
+        # Adding the overview text as a row as it might contain useful information
+        substeps_rows.append(row_dict)
+        
+        for s_idx, step in enumerate(guide["steps"]):
+            for ex_idx, explanation in enumerate(guide["steps"][step]["explanation"]):
+                row_dict = {
+                    "DOCUMENT_ID": document_id,
+                    "GUIDE_ID": guide_id,
+                    "GUIDE_NUMBER": g_idx,
+                    "PAGE_NUMBER": guide["steps"][step]["page_number"][ex_idx],
+                    "STEP": step,
+                    "STEP_LABEL": guide["steps"][step]["step_label"],
+                    "TEXT": guide["steps"][step]["explanation"][ex_idx],
+                    # "IMAGES": guide["steps"][step]["images"][ex_idx],
+                }
+                # Adding each Step and Explaination as a row
+                substeps_rows.append(row_dict)
+
+    substeps_df = pd.DataFrame(substeps_rows)
+    return substeps_df
+    
+
 if __name__ == "__main__":
-    # Example usage
-    file_path = "data\\Vestas_RTP\\Documents\\VGA_guides\\No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf"
-    extract_vga_guide(file_path = file_path)
+    pass
