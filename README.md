@@ -23,8 +23,9 @@ This proof-of-concept establishes a structured foundation for ongoing developmen
    pip install -r requirements.txt
    ```
 
-3. **Create a directory in `data` called `Vestas_RTP/Documents`**
-   - Place "No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf" in there.  
+3. **Create a directories in `data` called `Vestas_RTP/Documents/Documents` and `Vestas_RTP/Documents/VGA_guide`**
+   - Place "No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf" in the VGA_guide folder.
+   - Place "0078-6200_V07 - 0078-6200_4MW Mk3E Setting and Adjustment of Relays.pdf" in the Documents folder.
    - **Note:** The PDF files are not included in the repository.
    - **Note:** The pipeline is currently only designed to work with the VGA guide! Using other documents will break the pipeline!
    - **Do not commit the PDF files to the repository.**  
@@ -34,8 +35,11 @@ This proof-of-concept establishes a structured foundation for ongoing developmen
      └── data/
          └── Vestas_RTP/
              └── Documents/
-                 ├── No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf
-                 └── ...
+                 ├── Documents/
+                 |   └── 0078-6200_V07 - 0078-6200_4MW Mk3E Setting and Adjustment of Relays.pdf
+                 └── VGA_guide/
+                    └── No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf
+
      ```
 
 4. **Do not alter** `connection_config.yaml` _(see section 5)_.  
@@ -88,6 +92,9 @@ This proof-of-concept establishes a structured foundation for ongoing developmen
    cd RAG_LLM_POC_v1
    python tests/T.B.D
    ```
+
+4. **Change the verbosity_level in `config/log_config.yaml` for detailed logging.**  
+
 
 ---
 
