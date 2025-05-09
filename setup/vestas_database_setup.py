@@ -32,6 +32,8 @@ def create_vestas_schema_and_tables() -> bool:
         return True
     except Exception as e:
         return False
+    finally:
+        conn.close()
 
 
 def create_vestas_document_table() -> pd.DataFrame:

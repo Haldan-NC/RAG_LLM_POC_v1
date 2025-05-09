@@ -61,6 +61,8 @@ def get_table(table_name: str) -> pd.DataFrame | None:
     except Exception as e:
         log(f"Table {table_name} not found:", level=1)
         return None
+    finally:
+        conn.close()
 
 
 def get_documents_table() -> pd.DataFrame:
@@ -87,17 +89,17 @@ def create_documents_table(pdf_files_path: str) -> pd.DataFrame:
     Returns:
         pd.DataFrame: DataFrame containing the documents table.
     """
-    document_rows = []
-    conn, cursor = get_cursor()
-    cfg = get_connection_config()
-    database = cfg['snowflake']['vestas']['database']
-    schema = cfg['snowflake']['vestas']['schema']
     documents_df = get_documents_table()
 
     if type(documents_df) == pd.DataFrame:
         log("Documents table already exists. No need to create it again.", level=1)
     else:
-
+        conn, cursor = get_cursor()
+        document_rows = []
+        cfg = get_connection_config()
+        database = cfg['snowflake']['vestas']['database']
+        schema = cfg['snowflake']['vestas']['schema']
+        
         for idx, filename in enumerate(os.listdir(pdf_files_path)):
             if filename.endswith(".pdf"):
                 file_path = os.path.join(pdf_files_path, filename)
@@ -110,32 +112,35 @@ def create_documents_table(pdf_files_path: str) -> pd.DataFrame:
                     "DOC_VERSION": "N/A",  # Placeholder, you can modify this printic as needed
                     "FILE_SIZE": file_size
                 })
+        try: 
+            cursor.execute("""
+                CREATE OR REPLACE TABLE DOCUMENTS (
+                DOCUMENT_ID INT AUTOINCREMENT PRIMARY KEY,
+                DOCUMENT_NAME STRING,
+                DOC_VERSION STRING,
+                FILE_PATH STRING NOT NULL,
+                FILE_SIZE NUMBER,
+                CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP()
+                );
+            """)
+            time.sleep(2)  # Sleep for 2 seconds to ensure the table is ready in snowflake. We need to query the table to get the DOCUMENT_ID
 
-        cursor.execute("""
-            CREATE OR REPLACE TABLE DOCUMENTS (
-            DOCUMENT_ID INT AUTOINCREMENT PRIMARY KEY,
-            DOCUMENT_NAME STRING,
-            DOC_VERSION STRING,
-            FILE_PATH STRING NOT NULL,
-            FILE_SIZE NUMBER,
-            CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP()
-            );
-        """)
-        time.sleep(2)  # Sleep for 2 seconds to ensure the table is ready in snowflake. We need to query the table to get the DOCUMENT_ID
-
-        documents_df = pd.DataFrame(document_rows)
-        success, nchunks, nrows, output = write_pandas(
-            conn=conn,
-            df=documents_df,
-            database=database,
-            table_name="DOCUMENTS",
-            schema=schema,
-            auto_create_table=False,
-            overwrite=False
-        )
-        log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}", level=1)
-        time.sleep(2)  # Sleep for 3 seconds to ensure the table is ready in snowflake. We need to query the table to get the DOCUMENT_ID
-
+            documents_df = pd.DataFrame(document_rows)
+            success, nchunks, nrows, output = write_pandas(
+                conn=conn,
+                df=documents_df,
+                database=database,
+                table_name="DOCUMENTS",
+                schema=schema,
+                auto_create_table=False,
+                overwrite=False
+            )
+            log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}", level=1)
+            time.sleep(2)  # Sleep for 3 seconds to ensure the table is ready in snowflake. We need to query the table to get the DOCUMENT_ID
+        except Exception as e:
+            log(f"Table DOCUMENTS, could not be created:", level=1)
+        finally:
+            conn.close()
         documents_df = get_documents_table()
     return documents_df
 
@@ -169,35 +174,38 @@ def create_sections_table() -> pd.DataFrame:
         sections_df["PARENT_SECTION_NUMBER"] = sections_df["PARENT_SECTION_NUMBER"].astype(str)
 
         log(f"sections_df:\n {sections_df}", level=1)
+        try: 
+            cursor.execute("""
+                CREATE OR REPLACE TABLE SECTIONS (
+                SECTION_ID INT AUTOINCREMENT PRIMARY KEY,
+                DOCUMENT_ID INT NOT NULL,
+                SECTION STRING NOT NULL,
+                SECTION_NUMBER STRING NOT NULL,
+                PAGE INT,
+                PARENT_SECTION_NUMBER STRING,
+                CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
+                CONSTRAINT fk_document
+                    FOREIGN KEY (DOCUMENT_ID)
+                    REFERENCES DOCUMENTS(DOCUMENT_ID)
+            );
+            """)
 
-        cursor.execute("""
-            CREATE OR REPLACE TABLE SECTIONS (
-            SECTION_ID INT AUTOINCREMENT PRIMARY KEY,
-            DOCUMENT_ID INT NOT NULL,
-            SECTION STRING NOT NULL,
-            SECTION_NUMBER STRING NOT NULL,
-            PAGE INT,
-            PARENT_SECTION_NUMBER STRING,
-            CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
-            CONSTRAINT fk_document
-                FOREIGN KEY (DOCUMENT_ID)
-                REFERENCES DOCUMENTS(DOCUMENT_ID)
-        );
-        """)
-
-        time.sleep(2)  
-        success, nchunks, nrows, output = write_pandas(
-            conn=conn,
-            df=sections_df,
-            database =database,
-            table_name="SECTIONS",
-            schema=schema,
-            auto_create_table=False,
-            overwrite=False
-        )
-        log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}", verbose=1)
-
-        time.sleep(3) # Sleep for 3 seconds to ensure the table is ready in snowflake. We need to query the table to get the SECTION_ID
+            time.sleep(2)  
+            success, nchunks, nrows, output = write_pandas(
+                conn=conn,
+                df=sections_df,
+                database =database,
+                table_name="SECTIONS",
+                schema=schema,
+                auto_create_table=False,
+                overwrite=False
+            )
+            log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}", verbose=1)
+            time.sleep(3) # Sleep for 3 seconds to ensure the table is ready in snowflake. We need to query the table to get the SECTION_ID
+        except Exception as e:
+            log("Table SECTIONS, could not be created", level=1)
+        finally:
+            conn.close()
         sections_df = get_sections_table()
 
     return sections_df
@@ -211,17 +219,15 @@ def create_images_table(image_dest: str) -> pd.DataFrame:
     Returns:
         pd.DataFrame: DataFrame containing a pandas dataframe with the metadata for the images.
     """
-
-    cfg = get_connection_config()
-    database = cfg['snowflake']['vestas']['database']
-    schema = cfg['snowflake']['vestas']['schema']
-    conn, cursor = get_cursor()
-
     images_df = get_images_table()
     if type(images_df) == pd.DataFrame:
         log("Image table already exists. No need to create it again.", level=1)
 
     else: 
+        cfg = get_connection_config()
+        database = cfg['snowflake']['vestas']['database']
+        schema = cfg['snowflake']['vestas']['schema']
+        conn, cursor = get_cursor()
         documents_df = get_documents_table()
 
         all_manuals_metadata = {}
@@ -232,45 +238,49 @@ def create_images_table(image_dest: str) -> pd.DataFrame:
             
         images_df = generate_image_table(documents_df, image_dest, all_manuals_metadata)
 
-        cursor.execute("""
-            CREATE OR REPLACE TABLE IMAGES (
-            IMAGE_ID INT AUTOINCREMENT PRIMARY KEY,
-            DOCUMENT_ID INT NOT NULL,
-            PAGE INT,
-            IMG_ORDER INT,
-            IMAGE_FILE STRING,
-            IMAGE_PATH STRING,
-            IMAGE_SIZE NUMBER,
-            IMAGE_WIDTH NUMBER,
-            IMAGE_HEIGHT NUMBER,
-            IMAGE_X1 NUMBER,
-            IMAGE_Y1 NUMBER,
-            IMAGE_X2 NUMBER,
-            IMAGE_Y2 NUMBER,
-            DESCRIPTION STRING,
-            CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
+        try:
+            cursor.execute("""
+                CREATE OR REPLACE TABLE IMAGES (
+                IMAGE_ID INT AUTOINCREMENT PRIMARY KEY,
+                DOCUMENT_ID INT NOT NULL,
+                PAGE INT,
+                IMG_ORDER INT,
+                IMAGE_FILE STRING,
+                IMAGE_PATH STRING,
+                IMAGE_SIZE NUMBER,
+                IMAGE_WIDTH NUMBER,
+                IMAGE_HEIGHT NUMBER,
+                IMAGE_X1 NUMBER,
+                IMAGE_Y1 NUMBER,
+                IMAGE_X2 NUMBER,
+                IMAGE_Y2 NUMBER,
+                DESCRIPTION STRING,
+                CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
 
-            CONSTRAINT fk_document
-                FOREIGN KEY (DOCUMENT_ID)
-                REFERENCES DOCUMENTS(DOCUMENT_ID)
-                
-        );
-        """)
+                CONSTRAINT fk_document
+                    FOREIGN KEY (DOCUMENT_ID)
+                    REFERENCES DOCUMENTS(DOCUMENT_ID)
+                    
+            );
+            """)
 
-        time.sleep(2)  
-        success, nchunks, nrows, output = write_pandas(
-            conn=conn,
-            df=images_df,
-            database =database,
-            table_name="IMAGES",
-            schema=schema,
-            auto_create_table=False,
-            overwrite=False
-        )
+            time.sleep(2)  
+            success, nchunks, nrows, output = write_pandas(
+                conn=conn,
+                df=images_df,
+                database =database,
+                table_name="IMAGES",
+                schema=schema,
+                auto_create_table=False,
+                overwrite=False
+            )
 
-        time.sleep(2) # Sleep for 2 seconds to ensure the table is ready in snowflake. We need to query the table to get the SECTION_ID
-        images_df = get_images_table()
-
+            time.sleep(2) # Sleep for 2 seconds to ensure the table is ready in snowflake. We need to query the table to get the SECTION_ID
+            images_df = get_images_table()
+        except Exception as e:
+            log(f"Table IMAGES, could not be created:", level=1)
+        finally:
+            conn.close()
     return images_df
 
 def create_chunked_tables() -> pd.DataFrame:
@@ -306,6 +316,12 @@ def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> 
     else:
 
         conn, cursor = get_cursor()
+        documents_df = get_documents_table()
+        # Get Config    
+        cfg = get_connection_config()
+        database = cfg['snowflake']['vestas']['database']
+        schema = cfg['snowflake']['vestas']['schema']
+        
         create_table_sql = f"""
         CREATE OR REPLACE TABLE {table_name} (
             CHUNK_ID INT AUTOINCREMENT PRIMARY KEY,
@@ -321,54 +337,53 @@ def create_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> 
                 REFERENCES DOCUMENTS(DOCUMENT_ID)
         );
         """
-        cursor.execute(create_table_sql)
-        
-        documents_df = get_documents_table()
-        chunks_df = pd.DataFrame()
-        for row in tqdm(documents_df.iterrows(), total = len(documents_df), desc = f"Creating chunks for {table_name}"):
-            manual_id = row[1]["DOCUMENT_ID"]
-            file_path = row[1]["FILE_PATH"]
-            tmp_chunked_df = extract_text_chunks(file_path = file_path,
-                                manual_id = manual_id,
-                                chunk_size = chunk_size,#1024,
-                                chunk_overlap = chunk_overlap)  # Show first 5 chunks
-            chunks_df = pd.concat([chunks_df, tmp_chunked_df], ignore_index=True)
-        
-            log(f"Writing the {table_name} DataFrame to Snowflake", level=1)
+        try:
+            cursor.execute(create_table_sql)
             
-        # Get Config    
-        cfg = get_connection_config()
-        database = cfg['snowflake']['vestas']['database']
-        schema = cfg['snowflake']['vestas']['schema']
-        
-        
-        # Write the DataFrame to Snowflake
-        success, nchunks, nrows, output = write_pandas(
-            conn=conn,  # Convert conn, database objects to a object? 
-            df=chunks_df,
-            database =database,
-            table_name=table_name,
-            schema=schema,
-            auto_create_table=False,
-            overwrite=False
-        )
-        
-        log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}", level=1)
-        time.sleep(2)
-
-        # Update the embeddings for the chunks in the CHUNKS_LARGE table
-        cursor.execute(f"""
-            UPDATE {table_name}
-            SET EMBEDDING = SNOWFLAKE.CORTEX.EMBED_TEXT_1024(
-                'snowflake-arctic-embed-l-v2.0',
-                CHUNK_TEXT
+            chunks_df = pd.DataFrame()
+            for row in tqdm(documents_df.iterrows(), total = len(documents_df), desc = f"Creating chunks for {table_name}"):
+                manual_id = row[1]["DOCUMENT_ID"]
+                file_path = row[1]["FILE_PATH"]
+                tmp_chunked_df = extract_text_chunks(file_path = file_path,
+                                    manual_id = manual_id,
+                                    chunk_size = chunk_size,#1024,
+                                    chunk_overlap = chunk_overlap)  # Show first 5 chunks
+                chunks_df = pd.concat([chunks_df, tmp_chunked_df], ignore_index=True)
+            
+                log(f"Writing the {table_name} DataFrame to Snowflake", level=1)
+            
+            # Write the DataFrame to Snowflake
+            success, nchunks, nrows, output = write_pandas(
+                conn=conn,  # Convert conn, database objects to a object? 
+                df=chunks_df,
+                database =database,
+                table_name=table_name,
+                schema=schema,
+                auto_create_table=False,
+                overwrite=False
             )
-            WHERE EMBEDDING IS NULL;
-        """)
+            log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}", level=1)
+            time.sleep(2)
+        except Exception as e:
+            log(f"Table {table_name}, could not be created:", level=1)
 
-        time.sleep(2)
+        try:
+            # Update the embeddings for the chunks in the CHUNKS_LARGE table
+            cursor.execute(f"""
+                UPDATE {table_name}
+                SET EMBEDDING = SNOWFLAKE.CORTEX.EMBED_TEXT_1024(
+                    'snowflake-arctic-embed-l-v2.0',
+                    CHUNK_TEXT
+                )
+                WHERE EMBEDDING IS NULL;
+            """)
+
+            time.sleep(2)
+        except Exception as e:
+            log(f"Table {table_name}, could not be updated with EMBEDDING:", level=1)
+        finally:
+            conn.close()
         chunks_df = get_table(table_name)
-    
     return chunks_df
 
 
@@ -432,6 +447,7 @@ def populate_image_descriptions(images_df: pd.DataFrame) -> pd.DataFrame:
         """
         cursor.execute(update_sql, (description_response, image_id))
         cursor.connection.commit()
+        conn.close()
 
     return images_df
 

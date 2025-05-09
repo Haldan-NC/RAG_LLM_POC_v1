@@ -32,6 +32,7 @@ def find_document_by_machine_name(machine_name: str) -> dict:
         FROM DOCUMENTS;
     """)
     documents_df = cursor.fetch_pandas_all()
+    conn.close()
     
     for _, row in documents_df.iterrows():
         doc_name = row['DOCUMENT_NAME']
