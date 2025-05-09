@@ -41,7 +41,7 @@ def create_vestas_document_table() -> pd.DataFrame:
     Returns:
         pd.DataFrame: The documents DataFrame under the assumption the table was created successfully.
     """
-    pdf_files_path = "data\\Vestas_RTP\\Documents"
+    pdf_files_path = "data\\Vestas_RTP\\Documents\\Documents"
     document_rows = []
     conn,cursor = get_cursor()
     
@@ -82,6 +82,9 @@ def create_vestas_sections_table() -> None:
     return sections_df
 
 
+def 
+
+
 
 if __name__ == "__main__":
 
@@ -99,5 +102,7 @@ if __name__ == "__main__":
 
     # Create Images table
     images_df = create_vestas_images_table()
+
+    # Extract VGA Guide (seperate parser from other documents)
 
 
