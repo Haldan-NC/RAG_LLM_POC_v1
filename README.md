@@ -105,12 +105,11 @@ RAG_LLM_POC_v1/
 ├── config/
 │   ├── connection_config.yaml
 │   └── log_config.yaml
-├── docs/
 ├── setup/
 │   ├── washing_machine_database_setup.py
 │   └── vestas_database_setup.py
 ├── data/
-│   ├── Washing_Machine_Data
+│   ├── Vestas_RTP
 │   │   ├── Documents [PDF files]
 │   │   └── Images [Extracted images]
 │   └── Washing_Machine_Data
@@ -122,6 +121,7 @@ RAG_LLM_POC_v1/
 │   ├── ingestion/
 │   │   ├── image_extractor.py
 │   │   ├── pdf_parser.py
+│   │   ├── vga_pdf_parser.py
 │   │   └── llm_functions/
 │   │       ├── cortex_llm_functions.py
 │   │       └── openai_llm_functions.py
@@ -137,7 +137,7 @@ RAG_LLM_POC_v1/
     └── readme.txt
 ```
 
-- **setup/**: Database-initialization scripts (currently for a washing-machine example; replace with Vestas data).  
+- **setup/**: Database-initialization scripts. 
 - **data/**: Source PDFs and their extracted images.  
 - **src/db/**: Functions for Snowflake integration.  
 - **src/ingestion/**: ETL and ingestion logic, including `llm_functions/`.  
