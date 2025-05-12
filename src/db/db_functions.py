@@ -112,6 +112,12 @@ def write_to_table(df: pd.DataFrame, table_name: str) -> None:
     
 
 def prepare_documents_df(pdf_files_path: list) -> pd.DataFrame:
+    """
+    Prepares a DataFrame of documents used for ingestion for the Documents table.
+    The reason this function is separate from the create_documents_table function is that the VGA guide is parsed seperately from the other documents.
+    Args:
+        pdf_files_path (str): Path to the directory containing PDF files.
+    """
     document_rows = []
     for idx, filename in enumerate(os.listdir(pdf_files_path)):
         if filename.endswith(".pdf"):
@@ -370,6 +376,10 @@ def create_windowed_chunk_table(table_name: str, chunk_size: int, chunk_overlap:
 
 
 def create_embeddings_on_chunks(df: pd.DataFrame, chunks_col: str, table_name: str) -> None:
+    """
+    Creates embeddings for a string column in a Snowflake table.
+    It is plausible that we are interested in creating embeddings for various columns in the future.
+    """
     conn, cursor = get_cursor()
     try:
         # Update the embeddings for the chunks in the CHUNKS_LARGE table
@@ -388,6 +398,14 @@ def create_embeddings_on_chunks(df: pd.DataFrame, chunks_col: str, table_name: s
 
 
 def create_vga_guide_table() -> None:
+    """
+    A function to create the VGA_GUIDES table in the database.
+    The table is created with the intention of structuring the information of the VGA guides.
+    It might possibly be redundant in the great scheme of things, but it allows for flexibility in the future.
+
+    This table stores the metadata for each guide found in the VGA guide document, 
+        such as the guide name, guide number, page number, and wind turbine models for each guide. 
+    """
     try:
         conn, cursor = get_cursor()
         create_table_sql = f"""
@@ -413,7 +431,13 @@ def create_vga_guide_table() -> None:
 
 def create_vga_guide_steps_table() -> None:
     """
-    Creates a Snowflake table for the steps in the guides. The table is created if it does not exist.
+    A function to create the VGA_GUIDE_STEPS table in the database.
+    The table is created with the intention of structuring the information of the VGA guides.
+    It might possibly be redundant in the great scheme of things, but it allows for flexibility in the future.
+
+    This table stores the concatenated text data for each step in each guide, as each steps can have multiple substeps.
+        Concatenating the data for each step might allow for better performance when the text is embedded for vector search.
+    
     """
     try:
         conn, cursor = get_cursor()
@@ -447,7 +471,12 @@ def create_vga_guide_steps_table() -> None:
 
 def create_vga_guide_substeps_table() -> None:
     """
-    Creates a Snowflake table for the steps in the guides. The table is created if it does not exist.
+    A function to create the VGA_GUIDE_STEPS table in the database.
+    The table is created with the intention of structuring the information of the VGA guides.
+    It might possibly be redundant in the great scheme of things, but it allows for flexibility in the future.
+
+    This table stores the text data for each sub step in each step, in each guide.
+        Having a seperate table for the substeps can help us with mapping the images to the relevant substeps.
     """
     try:
         conn, cursor = get_cursor()

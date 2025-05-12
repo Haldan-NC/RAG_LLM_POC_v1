@@ -133,6 +133,13 @@ def extract_step_and_explanation_from_row(row: list) -> tuple:
 
 
 def get_step_num_and_label(step_label: str, real_page_num: int) -> int:
+    """
+    In some instances the extracted was incorrect, or the actual text had a type (ref: page 253 where the text was "rror Text:").
+    The function tidies up the text using string_hardcoded_bandaid() and returns the step number and label to be used later in the code.
+    Args:
+        step_label (str): The step label in the left column of the document.
+        real_page_num (int): The real page number of the document (not 0 indexed).
+    """
     log("---> Found new step and explanation", level = 3)
     step_label = string_hardcoded_bandaid(text = step_label, real_page_num = real_page_num)
     if type(eval(step_label.split(".")[0]))==int:
@@ -366,6 +373,18 @@ def extract_guide_name_from_text(text: str) -> str:
 
 
 def create_vga_guide_dataframe(guides: list, document_id: int) -> pd.DataFrame:
+    """
+    A function which creates the dataframe which is written to the database.
+    Each row corresponds to a guide in the VGA pdf.
+
+    The dataframe contains the following columns:
+        - DOCUMENT_ID: The document ID of the guide (foreign key)
+        - GUIDE_NUMBER: The number of the guide
+        - PAGE_NUMBER: The page number of the guide
+        - GUIDE_NAME: The name of the guide
+        - STEPS: The number of steps in the guide
+        - TURBINE_MODELS: The turbine models in the guide
+    """
     guides_df = pd.DataFrame(guides)
     guides_df["steps"] = [len(guides[i]['steps']) for i in range(len(guides))]
     guides_df.reset_index(inplace=True)
@@ -386,7 +405,7 @@ def create_vga_guide_dataframe(guides: list, document_id: int) -> pd.DataFrame:
 def find_guide_ID_from_name(guides_df: pd.DataFrame, guide_name: str) -> int:
     """
     Finds the guide ID from the guide name.
-    The guide ID is the index of the guide in the guides_df dataframe.
+    The guide ID is used to reference the guide in the database.
     """
     for i, row in guides_df.iterrows():
         if row["GUIDE_NAME"] == guide_name:
@@ -395,6 +414,20 @@ def find_guide_ID_from_name(guides_df: pd.DataFrame, guide_name: str) -> int:
 
 
 def create_vga_guide_steps_dataframe(guides: list, guides_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    A function which creates the dataframe which is written to the database.
+    Each row corresponds to an entire step in a guide in the VGA pdf.
+
+    The dataframe contains the following columns:
+        - DOCUMENT_ID: The document ID of the guide (foreign key)
+        - GUIDE_ID: The guide ID of the guide (foreign key)
+        - GUIDE_NUMBER: The number of the guide (slightly redundant in terms of normalizing the database)
+        - PAGE_START: The start page of the step
+        - PAGE_END: The end page of the step
+        - STEP: The step number
+        - STEP_LABEL: The step label
+        - TEXT: The concatenated text of the entire step, whether its a small step or a 4 page step.
+    """
     combined_steps_rows = []
     document_id = guides_df["DOCUMENT_ID"].iloc[0]
 
@@ -444,6 +477,23 @@ def create_vga_guide_steps_dataframe(guides: list, guides_df: pd.DataFrame) -> p
     
 
 def create_vga_guide_substeps_dataframe(guides: list, guides_df: pd.DataFrame) -> pd.DataFrame:
+    """ 
+    A function which creates the dataframe which is written to the database.
+    Each row corresponds to a sub step in a step in the VGA pdf.
+
+    A sub step is defined by a section of a step which covers multiples pages, which happens more often than not in the VGA guide.
+    A sub step is at most a single page.
+    Example: Page 278-280 (step 2.) covers 3 pages, thus, contains 3 sub steps.
+
+    The dataframe contains the following columns:
+        - DOCUMENT_ID: The document ID of the guide (foreign key)
+        - GUIDE_ID: The guide ID of the guide (foreign key)
+        - GUIDE_NUMBER: The number of the guide (slightly redundant in terms of normalizing the database)
+        - PAGE_NUMBER: The page number of the step
+        - STEP: The step number
+        - STEP_LABEL: The step label
+        - TEXT: The text of the specific sub step. Sub steps occur when a single step covers multiple pages. 
+    """
     substeps_rows = []
     document_id = guides_df["DOCUMENT_ID"].iloc[0]
 
