@@ -417,6 +417,7 @@ def create_vga_guide_table() -> None:
                 GUIDE_NAME STRING NOT NULL,
                 STEPS INT,
                 TURBINE_MODELS STRING,
+                EMBEDDING VECTOR(FLOAT, 1024),
                 CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
                 CONSTRAINT fk_document
                     FOREIGN KEY (DOCUMENT_ID)
@@ -452,6 +453,7 @@ def create_vga_guide_steps_table() -> None:
                 STEP INT,
                 STEP_LABEL STRING,
                 TEXT STRING,
+                EMBEDDING VECTOR(FLOAT, 1024),
                 CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
 
                 CONSTRAINT fk_guide
@@ -490,6 +492,7 @@ def create_vga_guide_substeps_table() -> None:
                 STEP INT,
                 STEP_LABEL STRING,
                 TEXT STRING,
+                EMBEDDING VECTOR(FLOAT, 1024),
                 CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
 
                 CONSTRAINT fk_guide

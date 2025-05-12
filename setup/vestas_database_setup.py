@@ -110,13 +110,21 @@ def process_vga_guide() -> None:
 
         guides_df = create_vga_guide_dataframe(guides = guides, document_id = document_id)
         write_to_table(df = guides_df, table_name="VGA_GUIDES")
+        # Creating embeddings for the titles of the VGA guides
+        create_embeddings_on_chunks(chunks_col = "GUIDE_NAME", table_name = "VGA_GUIDES")
         guides_df = get_table(table_name = "VGA_GUIDES")
 
         steps_df = create_vga_guide_steps_dataframe(guides = guides,  guides_df = guides_df)
         write_to_table(df = steps_df, table_name="VGA_GUIDE_STEPS")
+        # Creating embeddings for the text content of each step in a guide.
+        create_embeddings_on_chunks(chunks_col = "TEXT", table_name = "VGA_GUIDE_STEPS")
 
         substeps_df = create_vga_guide_substeps_dataframe(guides = guides, guides_df = guides_df)
         write_to_table(df = substeps_df, table_name="VGA_GUIDE_SUBSTEPS")
+        # Creating embeddings for the text content of each substep. Some of them are empty strings.
+        create_embeddings_on_chunks(chunks_col = "TEXT", table_name = "VGA_GUIDE_SUBSTEPS")
+
+
 
 
 if __name__ == "__main__":
