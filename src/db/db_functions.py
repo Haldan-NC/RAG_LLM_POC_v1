@@ -12,10 +12,10 @@ import pandas as pd
 import snowflake.connector as sf_connector
 from snowflake.connector.pandas_tools import write_pandas
 from src.utils.utils import get_connection_config, log
-from src.ingestion.llm_functions.open_ai_llm_functions import extract_TOC_OpenAI
 from src.ingestion.image_extractor import extract_images_from_pdf, generate_image_table
 from src.ingestion.pdf_parser import extract_text_chunks
-from src.ingestion.llm_functions.open_ai_llm_functions import call_openai_api_for_image_description
+from src.llm_functions.open_ai_llm_functions import extract_TOC_OpenAI
+from src.llm_functions.open_ai_llm_functions import call_openai_api_for_image_description
 
 
 def get_cursor() -> [sf_connector, sf_connector.cursor]:

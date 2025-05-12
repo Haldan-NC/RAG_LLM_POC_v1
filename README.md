@@ -106,18 +106,14 @@ RAG_LLM_POC_v1/
 │   ├── connection_config.yaml
 │   └── log_config.yaml
 ├── setup/
-│   ├── washing_machine_database_setup.py
 │   └── vestas_database_setup.py
 ├── data/
-│   ├── Vestas_RTP/
-│   │   ├── Documents/
-│   │   │   └── Documents/
-│   │   │       └── 0078-6200_V07 - 0078-6200_4MW Mk3E Setting and Adjustment of Relays.pdf
-│   │   │   └── VGA_guides/
-│   │   │       └── No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf
-│   └── Washing_Machine_Data/
-│       ├── Documents [PDF files]/
-│       └── Images [Extracted images]/
+│   └── Vestas_RTP/
+│       └── Documents/
+│           ├── Documents/
+│           |   └── 0078-6200_V07 - 0078-6200_4MW Mk3E Setting and Adjustment of Relays.pdf
+│           └── VGA_guides/
+│               └── No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf
 ├── src/
 │   ├── db/
 │   │   └── db_functions.py
@@ -125,9 +121,9 @@ RAG_LLM_POC_v1/
 │   │   ├── image_extractor.py
 │   │   ├── pdf_parser.py
 │   │   ├── vga_pdf_parser.py
-│   │   └── llm_functions/
-│   │       ├── cortex_llm_functions.py
-│   │       └── openai_llm_functions.py
+│   ├── llm_functions/
+│   │   ├── cortex_llm_functions.py
+│   │   └── openai_llm_functions.py
 │   ├── rag/
 │   │   ├── app.py
 │   │   ├── generator.py
@@ -144,7 +140,7 @@ RAG_LLM_POC_v1/
 - **data/**: Source PDFs and their extracted images.  
 - **src/db/**: Functions for Snowflake integration.  
 - **src/ingestion/**: ETL and ingestion logic, including `llm_functions/`.  
-- **src/rag/**: Retrieval-Augmented Generation pipeline entry point.  
+- **src/rag/**: Retrieval-Augmented Generation pipeline.  
 - **src/utils/**: Shared utility code.  
 - **tests/**: Test pipelines for performance and benchmarking.  
 - **config/**: Connection files for windows credential manager (e.g. `connection_config.yaml`), replaceable with Azure Key Vault or environment variables in the future.
