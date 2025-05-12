@@ -9,6 +9,7 @@ import pandas as pd
 from src.db.db_functions import *
 from src.db.db_functions import create_chunked_tables, create_sections_table, create_images_table # Purely for the sake of readability
 from src.utils.utils import get_connection_config
+from src.utils.utils import log
 from src.ingestion.vga_pdf_parser import extract_vga_guide
 from src.ingestion.vga_pdf_parser import * # All functions from vga_pdf_parser is inside the function process_vga_guide()
 
@@ -98,6 +99,7 @@ def process_vga_guide() -> None:
     file_path = "data\\Vestas_RTP\\Documents\\VGA_guides"
 
     documents_df = append_vga_guide_to_documents_table()
+
     create_vga_guide_table()
     create_vga_guide_steps_table()
     create_vga_guide_substeps_table()
@@ -110,13 +112,97 @@ def process_vga_guide() -> None:
 
         guides_df = create_vga_guide_dataframe(guides = guides, document_id = document_id)
         write_to_table(df = guides_df, table_name="VGA_GUIDES")
+        # Creating embeddings for the titles of the VGA guides
+        create_embeddings_on_chunks(chunks_col = "GUIDE_NAME", table_name = "VGA_GUIDES")
         guides_df = get_table(table_name = "VGA_GUIDES")
 
         steps_df = create_vga_guide_steps_dataframe(guides = guides,  guides_df = guides_df)
         write_to_table(df = steps_df, table_name="VGA_GUIDE_STEPS")
+        # Creating embeddings for the text content of each step in a guide.
+        create_embeddings_on_chunks(chunks_col = "TEXT", table_name = "VGA_GUIDE_STEPS")
 
         substeps_df = create_vga_guide_substeps_dataframe(guides = guides, guides_df = guides_df)
         write_to_table(df = substeps_df, table_name="VGA_GUIDE_SUBSTEPS")
+        # Creating embeddings for the text content of each substep. Some of them are empty strings.
+        create_embeddings_on_chunks(chunks_col = "TEXT", table_name = "VGA_GUIDE_SUBSTEPS")
+
+
+
+def create_vestas_unified_chunk_table() -> None:
+    """
+    Creates a unified table for all text related tables and writes it to the database.
+    This function creates a unified dataframe for all text related tables.
+    This dataframe will th
+
+    Returns:
+        pd.DataFrame: The unified chunk DataFrame.
+    """
+    log("Creating unified chunk dataframe for a table called UNION_CHUNKS...", level=1)
+    
+    dataframes_to_be_concatenated = []
+
+    for table in ["CHUNKS_SMALL", "CHUNKS_LARGE"]:
+        # Only getting the columns of interest from the chunked tables. Doing it this way won't break the code if new columns are added to the tables.
+        chunks_df = get_table(table_name = f"{table}")[["CHUNK_ID", "DOCUMENT_ID", "CHUNK_TEXT", "CHUNK_ORDER" ,"PAGE_START_NUMBER", "PAGE_END_NUMBER"]]
+        # Renaming columns to match the unified chunk table.
+        chunks_df.rename(columns = {"CHUNK_TEXT": "TEXT", 
+                                        "CHUNK_ID": "PREV_ID",
+                                        "CHUNK_ORDER": "STEP_OR_INDEX",
+                                        "PAGE_START_NUMBER": "PAGE_START",
+                                        "PAGE_END_NUMBER": "PAGE_END"}, inplace = True)
+        chunks_df["ORIGIN_TABLE"] = f"{table}"
+        dataframes_to_be_concatenated.append(chunks_df)
+
+    # Only VGA_GUIDES_STEPS will be included for the unified chunk table. Can be changed if required.
+    vga_guide_df = get_table(table_name = "VGA_GUIDE_STEPS")[["GUIDE_STEP_ID", "DOCUMENT_ID", "STEP_LABEL", "TEXT", "STEP" ,"PAGE_START", "PAGE_END"]]
+    new_text_col = [f"STEP LABEL:{x['STEP_LABEL']}\n TEXT:{x['TEXT']}" for index, x in vga_guide_df.iterrows()]
+    vga_guide_df["TEXT"] = new_text_col
+    vga_guide_df.drop(columns = ["STEP_LABEL"], inplace = True)
+    vga_guide_df.rename(columns = {"GUIDE_STEP_ID": "PREV_ID", 
+                                        "STEP": "STEP_OR_INDEX"}, inplace = True)
+    vga_guide_df["ORIGIN_TABLE"] = "VGA_GUIDE_STEPS"
+    dataframes_to_be_concatenated.append(vga_guide_df)
+
+    # Iterate through the rows and create Chunk size column
+    for df in dataframes_to_be_concatenated:
+        df["CHUNK_SIZE"] = len(df["TEXT"].iloc[0])
+
+    unified_chunk_df = pd.concat(dataframes_to_be_concatenated, ignore_index=True)
+    
+    # Create a new table in the database for the unified chunk table.
+    log("Creating UNION_CHUNKS in the database...", level=1)
+    conn, cursor = get_cursor()
+    create_table_sql = f"""
+        CREATE OR REPLACE TABLE UNION_CHUNKS (
+            CHUNK_ID INT AUTOINCREMENT PRIMARY KEY,
+            TEXT STRING,
+            EMBEDDING VECTOR(FLOAT, 1024),
+            CHUNK_SIZE INT,
+            PREV_ID INT,
+            ORIGIN_TABLE STRING,
+            DOCUMENT_ID INT NOT NULL,
+            PAGE_START INT,
+            PAGE_END INT,
+            STEP_OR_INDEX INT,
+            CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
+
+            CONSTRAINT fk_document
+                FOREIGN KEY (DOCUMENT_ID)
+                REFERENCES DOCUMENTS(DOCUMENT_ID)
+        );
+        """
+    cursor.execute(create_table_sql)
+    conn.close()
+
+    # Write the unified chunk DataFrame to the database.
+    log("Writing to UNION_CHUNKS...", level=1)
+    write_to_table(df = unified_chunk_df, table_name="UNION_CHUNKS")
+
+    # Updating the embeddings for the unified chunk table.
+    log("Creating embeddings for UNION_CHUNKS...", level=1)
+    create_embeddings_on_chunks(chunks_col = "TEXT", table_name = "UNION_CHUNKS")
+
+
 
 
 if __name__ == "__main__":
@@ -131,10 +217,13 @@ if __name__ == "__main__":
     large_chunks_df, small_chunks_df = create_chunked_tables()
 
     # # Create sections table (Not implemented for Vestas / Serves as a placeholder)
-    sections_df = create_vestas_sections_table()
+    # sections_df = create_vestas_sections_table()
 
     # # Create Images table
     images_df = create_vestas_images_table()
 
     # Extract VGA Guide (seperate parser from other documents)
     process_vga_guide()
+
+    # Create a unified table for all chunks
+    create_vestas_unified_chunk_table()
