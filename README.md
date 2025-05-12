@@ -105,23 +105,26 @@ RAG_LLM_POC_v1/
 ├── config/
 │   ├── connection_config.yaml
 │   └── log_config.yaml
-├── docs/
 ├── setup/
 │   ├── washing_machine_database_setup.py
 │   └── vestas_database_setup.py
 ├── data/
-│   ├── Washing_Machine_Data
-│   │   ├── Documents [PDF files]
-│   │   └── Images [Extracted images]
-│   └── Washing_Machine_Data
-│       ├── Documents [PDF files]
-│       └── Images [Extracted images]
+│   ├── Vestas_RTP/
+│   │   ├── Documents/
+│   │   │   └── Documents/
+│   │   │       └── 0078-6200_V07 - 0078-6200_4MW Mk3E Setting and Adjustment of Relays.pdf
+│   │   │   └── VGA_guides/
+│   │   │       └── No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf
+│   └── Washing_Machine_Data/
+│       ├── Documents [PDF files]/
+│       └── Images [Extracted images]/
 ├── src/
 │   ├── db/
 │   │   └── db_functions.py
 │   ├── ingestion/
 │   │   ├── image_extractor.py
 │   │   ├── pdf_parser.py
+│   │   ├── vga_pdf_parser.py
 │   │   └── llm_functions/
 │   │       ├── cortex_llm_functions.py
 │   │       └── openai_llm_functions.py
@@ -137,7 +140,7 @@ RAG_LLM_POC_v1/
     └── readme.txt
 ```
 
-- **setup/**: Database-initialization scripts (currently for a washing-machine example; replace with Vestas data).  
+- **setup/**: Database-initialization scripts. 
 - **data/**: Source PDFs and their extracted images.  
 - **src/db/**: Functions for Snowflake integration.  
 - **src/ingestion/**: ETL and ingestion logic, including `llm_functions/`.  
