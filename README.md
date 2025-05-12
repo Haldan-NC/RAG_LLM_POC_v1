@@ -23,8 +23,8 @@ This proof-of-concept establishes a structured foundation for ongoing developmen
    pip install -r requirements.txt
    ```
 
-3. **Create a directories in `data` called `Vestas_RTP/Documents/Documents` and `Vestas_RTP/Documents/VGA_guide`**
-   - Place "No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf" in the VGA_guide folder.
+3. **Create a directories in `data` called `Vestas_RTP/Documents/Documents` and `Vestas_RTP/Documents/VGA_guides`**
+   - Place "No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf" in the VGA_guides folder.
    - Place "0078-6200_V07 - 0078-6200_4MW Mk3E Setting and Adjustment of Relays.pdf" in the Documents folder.
    - **Note:** The PDF files are not included in the repository.
    - **Note:** The pipeline is currently only designed to work with the VGA guide! Using other documents will break the pipeline!
@@ -37,7 +37,7 @@ This proof-of-concept establishes a structured foundation for ongoing developmen
              └── Documents/
                  ├── Documents/
                  |   └── 0078-6200_V07 - 0078-6200_4MW Mk3E Setting and Adjustment of Relays.pdf
-                 └── VGA_guide/
+                 └── VGA_guides/
                     └── No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf
 
      ```
