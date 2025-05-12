@@ -285,7 +285,7 @@ def create_images_table(image_dest: str) -> None:
             conn.close()
 
 
-def create_chunked_tables() -> None:
+def create_chunked_tables() -> pd.DataFrame:
     """
     Creates CHUNKS_SMALL, and CHUNKS_LARGE tables in the database.
     First it checks if the tables already exist, and if not, it creates them.
@@ -372,10 +372,10 @@ def create_windowed_chunk_table(table_name: str, chunk_size: int, chunk_overlap:
         log(f"Exception: {e}:", level=1)
 
     # Add the embeddings to the chunks
-    create_embeddings_on_chunks(df = chunks_df, chunks_col = "CHUNK_TEXT", table_name = table_name)
+    create_embeddings_on_chunks(chunks_col = "CHUNK_TEXT", table_name = table_name)
 
 
-def create_embeddings_on_chunks(df: pd.DataFrame, chunks_col: str, table_name: str) -> None:
+def create_embeddings_on_chunks(chunks_col: str, table_name: str) -> None:
     """
     Creates embeddings for a string column in a Snowflake table.
     It is plausible that we are interested in creating embeddings for various columns in the future.
