@@ -53,7 +53,8 @@ def create_vestas_document_table() -> pd.DataFrame:
     if type(documents_df) == pd.DataFrame:
         log("Documents table already exists. No need to create it again.", level=1)
     else:
-        documents_df = create_documents_table(pdf_files_path)
+        create_documents_table(pdf_files_path)
+        documents_df = get_documents_table()
 
     return documents_df
 

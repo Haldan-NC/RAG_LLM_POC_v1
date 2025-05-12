@@ -81,7 +81,7 @@ def get_images_table() -> pd.DataFrame:
         return get_table("IMAGES")
 
 
-def write_to_table(df: pd.DataFrame, table_name: str) -> pd.DataFrame:
+def write_to_table(df: pd.DataFrame, table_name: str) -> None:
     """
     Appends a DataFrame to the Snowflake documents table.
     Args:
@@ -94,7 +94,8 @@ def write_to_table(df: pd.DataFrame, table_name: str) -> pd.DataFrame:
     database = cfg['snowflake']['vestas']['database']
     schema = cfg['snowflake']['vestas']['schema']
 
-    success, nchunks, nrows, output = write_pandas(
+    try:
+        success, nchunks, nrows, output = write_pandas(
             conn=conn,
             df=df,
             database=database,
@@ -103,23 +104,11 @@ def write_to_table(df: pd.DataFrame, table_name: str) -> pd.DataFrame:
             auto_create_table=False,
             overwrite=False
         )
-    log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}, Table Name: {table_name}", level=1)
-
-    # try:
-    #     success, nchunks, nrows, output = write_pandas(
-    #         conn=conn,
-    #         df=df,
-    #         database=database,
-    #         table_name=table_name,
-    #         schema=schema,
-    #         auto_create_table=False,
-    #         overwrite=False
-    #     )
-    #     log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}, Table Name: {table_name}", level=1)
-    # except Exception as e:
-    #     log(f"Table {table_name}, could not be written to:", level=1)
-    # finally:
-    #     conn.close()
+        log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}, Table Name: {table_name}", level=1)
+    except Exception as e:
+        log(f"Table {table_name}, could not be written to:", level=1)
+    finally:
+        conn.close()
     
 
 def prepare_documents_df(pdf_files_path: list) -> pd.DataFrame:
@@ -141,7 +130,7 @@ def prepare_documents_df(pdf_files_path: list) -> pd.DataFrame:
     return documents_df
 
 
-def create_documents_table(pdf_files_path: str) -> pd.DataFrame:
+def create_documents_table(pdf_files_path: str) -> None:
     """
     Creates a Snowflake table for documents. The table is created if it does not exist.
     Args:
@@ -175,11 +164,9 @@ def create_documents_table(pdf_files_path: str) -> pd.DataFrame:
         log(f"Table DOCUMENTS, could not be created:", level=1)
     finally:
         conn.close()
-    documents_df = get_documents_table()
-    return documents_df
 
 
-def create_sections_table() -> pd.DataFrame:
+def create_sections_table() -> None:
     """
     Old functions which worked with washing machine data. Requires a lot of polishing.
     """
@@ -189,8 +176,6 @@ def create_sections_table() -> pd.DataFrame:
     database = cfg['snowflake']['vestas']['database']
     schema = cfg['snowflake']['vestas']['schema']
     sections_df_list = []
-
-    documents_df = get_documents_table()
 
     # No max columns for pandas 
     pd.set_option('display.max_columns', None)
@@ -230,12 +215,9 @@ def create_sections_table() -> pd.DataFrame:
         log("Table SECTIONS, could not be created", level=1)
     finally:
         conn.close()
-    sections_df = get_sections_table()
-
-    return sections_df
 
 
-def create_images_table(image_dest: str) -> pd.DataFrame:
+def create_images_table(image_dest: str) -> None:
     """
     Creates a Snowflake table of metadata for images. The table is created if it does not exist.
     Args:
@@ -291,30 +273,44 @@ def create_images_table(image_dest: str) -> pd.DataFrame:
 
             time.sleep(1)  
             write_to_table(df = images_df, table_name = "IMAGES")
-            images_df = get_images_table()
         except Exception as e:
             log(f"Table IMAGES, could not be created:", level=1)
         finally:
             conn.close()
-    return images_df
 
-def create_chunked_tables() -> pd.DataFrame:
+
+def create_chunked_tables() -> None:
     """
     Creates CHUNKS_SMALL, and CHUNKS_LARGE tables in the database.
+    First it checks if the tables already exist, and if not, it creates them.
+
+    Returns:
+        2x pd.DataFrame: CHUNKS_LARGE and CHUNKS_SMALL tables.
     """
-    large_chunks_df = create_large_chunks_table()
-    small_chunks_df = create_small_chunks_table()
+    for table_name in ["CHUNKS_LARGE", "CHUNKS_SMALL"]:
+        chunks_df = get_table(table_name)
+        if type(chunks_df) == pd.DataFrame:
+            log(f"{table_name} table already exists. No need to create it again.", level=1)
+        else:
+            # This loop could potentially be improved with an enum class (JEED's suggestion)
+            if table_name == "CHUNKS_LARGE":
+                create_large_chunks_table()
+            elif table_name == "CHUNKS_SMALL":
+                create_small_chunks_table()
+            else:
+                log(f"Table {table_name} not found:", level=1)
 
-    return large_chunks_df, small_chunks_df
+    return get_large_chunk_table(), get_small_chunk_table()
 
-def create_large_chunks_table() -> pd.DataFrame:
+
+def create_large_chunks_table() -> None:
     return create_windowed_chunk_table("CHUNKS_LARGE", 7000, 128)
 
-def create_small_chunks_table() -> pd.DataFrame:
+def create_small_chunks_table() -> None:
     return create_windowed_chunk_table("CHUNKS_SMALL", 1024, 64)
 
 
-def create_windowed_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> pd.DataFrame:
+def create_windowed_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> None:
     """Method for creating a snowflake table for chunks.
     
     Args:
@@ -325,62 +321,55 @@ def create_windowed_chunk_table(table_name: str, chunk_size: int, chunk_overlap:
     Returns:
         pandas.DataFrame: panadas dataframe object representing the created table in snowflake for large chunks
     """
-    chunks_df = get_table(table_name)
-    if type(chunks_df) == pd.DataFrame:
-        log(f"{table_name} table already exists. No need to create it again.", level=1)
-
-    else:
-        conn, cursor = get_cursor()
-        documents_df = get_documents_table()
-        # Get Config    
-        cfg = get_connection_config()
-        database = cfg['snowflake']['vestas']['database']
-        schema = cfg['snowflake']['vestas']['schema']
+    
+    conn, cursor = get_cursor()
+    documents_df = get_documents_table()
+    # Get Config    
+    cfg = get_connection_config()
+    database = cfg['snowflake']['vestas']['database']
+    schema = cfg['snowflake']['vestas']['schema']
+    
+    create_table_sql = f"""
+    CREATE OR REPLACE TABLE {table_name} (
+        CHUNK_ID INT AUTOINCREMENT PRIMARY KEY,
+        DOCUMENT_ID INT NOT NULL,
+        PAGE_START_NUMBER INT,
+        PAGE_END_NUMBER INT,
+        CHUNK_ORDER INT,
+        CHUNK_TEXT STRING NOT NULL,
+        EMBEDDING VECTOR(FLOAT, 1024),
+        CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
+        CONSTRAINT fk_document
+            FOREIGN KEY (DOCUMENT_ID)
+            REFERENCES DOCUMENTS(DOCUMENT_ID)
+    );
+    """
+    cursor.execute(create_table_sql) # Creating the table without data
+    try:
+    
+        chunks_df = pd.DataFrame()
+        for row in tqdm(documents_df.iterrows(), total = len(documents_df), desc = f"Creating chunks for {table_name}"):
+            manual_id = row[1]["DOCUMENT_ID"]
+            file_path = row[1]["FILE_PATH"]
+            tmp_chunked_df = extract_text_chunks(file_path = file_path,
+                                manual_id = manual_id,
+                                chunk_size = chunk_size,#1024,
+                                chunk_overlap = chunk_overlap)  # Show first 5 chunks
+            chunks_df = pd.concat([chunks_df, tmp_chunked_df], ignore_index=True)
         
-        create_table_sql = f"""
-        CREATE OR REPLACE TABLE {table_name} (
-            CHUNK_ID INT AUTOINCREMENT PRIMARY KEY,
-            DOCUMENT_ID INT NOT NULL,
-            PAGE_START_NUMBER INT,
-            PAGE_END_NUMBER INT,
-            CHUNK_ORDER INT,
-            CHUNK_TEXT STRING NOT NULL,
-            EMBEDDING VECTOR(FLOAT, 1024),
-            CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
-            CONSTRAINT fk_document
-                FOREIGN KEY (DOCUMENT_ID)
-                REFERENCES DOCUMENTS(DOCUMENT_ID)
-        );
-        """
-        cursor.execute(create_table_sql) # Creating the table without data
-        try:
+            log(f"Writing the {table_name} DataFrame to Snowflake", level=1)
         
-            chunks_df = pd.DataFrame()
-            for row in tqdm(documents_df.iterrows(), total = len(documents_df), desc = f"Creating chunks for {table_name}"):
-                manual_id = row[1]["DOCUMENT_ID"]
-                file_path = row[1]["FILE_PATH"]
-                tmp_chunked_df = extract_text_chunks(file_path = file_path,
-                                    manual_id = manual_id,
-                                    chunk_size = chunk_size,#1024,
-                                    chunk_overlap = chunk_overlap)  # Show first 5 chunks
-                chunks_df = pd.concat([chunks_df, tmp_chunked_df], ignore_index=True)
-            
-                log(f"Writing the {table_name} DataFrame to Snowflake", level=1)
-            
-            # Write the DataFrame to Snowflake
-            write_to_table(df = chunks_df, table_name = table_name)
-        except Exception as e:
-            log(f"Table {table_name}, could not be created:", level=1)
-            log(f"Exception: {e}:", level=1)
+        # Write the DataFrame to Snowflake
+        write_to_table(df = chunks_df, table_name = table_name)
+    except Exception as e:
+        log(f"Table {table_name}, could not be created:", level=1)
+        log(f"Exception: {e}:", level=1)
 
-        # Add the embeddings to the chunks
-        create_embeddings_on_chunks(df = chunks_df, chunks_col = "CHUNK_TEXT", table_name = table_name)
-        chunks_df = get_table(table_name)
-
-    return chunks_df
+    # Add the embeddings to the chunks
+    create_embeddings_on_chunks(df = chunks_df, chunks_col = "CHUNK_TEXT", table_name = table_name)
 
 
-def create_embeddings_on_chunks(df: pd.DataFrame, chunks_col: str, table_name: str) -> bool:
+def create_embeddings_on_chunks(df: pd.DataFrame, chunks_col: str, table_name: str) -> None:
     conn, cursor = get_cursor()
     try:
         # Update the embeddings for the chunks in the CHUNKS_LARGE table
@@ -393,11 +382,9 @@ def create_embeddings_on_chunks(df: pd.DataFrame, chunks_col: str, table_name: s
             WHERE EMBEDDING IS NULL;
         """)
         conn.close()
-        return True
     except Exception as e:
         log(f"Table {table_name}, could not be updated with EMBEDDING:", level=1)
         conn.close()
-        return False
 
 
 def create_vga_guide_table() -> None:
@@ -490,13 +477,12 @@ def create_vga_guide_substeps_table() -> None:
         log(f"Table VGA_GUIDE_SUBSTEPS, could not be created:", level=1)
     conn.close()
 
-    
 
-def populate_image_descriptions(images_df: pd.DataFrame) -> pd.DataFrame:
+def populate_image_descriptions(sub_images_df: pd.DataFrame) -> pd.DataFrame:
     """ 
-    Populates the image descriptions in the images_df DataFrame using OpenAI API.
+    Populates the image descriptions in the sub_images_df DataFrame using OpenAI API.
     Args:
-        images_df (pd.DataFrame): DataFrame containing image information.
+        sub_images_df (pd.DataFrame): DataFrame containing image information of the images found relvant to be processed with respect to the chunks of interest.
     Returns:
         pd.DataFrame: Updated DataFrame with image descriptions.
     """
@@ -505,7 +491,7 @@ def populate_image_descriptions(images_df: pd.DataFrame) -> pd.DataFrame:
 
     # Iterate through each image and generate a description using OpenAI API
     # For each iteration, context of the image is required. It will use all small chunks of the page of the image, and the image itself.
-    for idx, row in tqdm(images_df.iterrows(), total=len(images_df), desc="Populating image descriptions"):
+    for idx, row in tqdm(sub_images_df.iterrows(), total=len(sub_images_df), desc="Populating image descriptions"):
         if len(row["DESCRIPTION"]) > 0:
             log(f"Image ID {row['IMAGE_ID']} already has a description. Skipping...", level=1)
             continue # Skip if description already exists
@@ -541,7 +527,7 @@ def populate_image_descriptions(images_df: pd.DataFrame) -> pd.DataFrame:
         description_response = call_openai_api_for_image_description(file_location, prompt)
 
         # Store the generated description in the DataFrame
-        images_df.at[idx, "DESCRIPTION"] = description_response
+        sub_images_df.at[idx, "DESCRIPTION"] = description_response
         log(f"Updated IMAGE table for image ID:{image_id} with new description", level=1)
 
         # Update the database with the new description
@@ -554,7 +540,8 @@ def populate_image_descriptions(images_df: pd.DataFrame) -> pd.DataFrame:
         cursor.connection.commit()
         conn.close()
 
-    return images_df
+    return sub_images_df
+
 
 
 if __name__ == "__main__":
