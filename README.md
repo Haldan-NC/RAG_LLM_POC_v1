@@ -113,8 +113,8 @@ RAG_LLM_POC_v1/
 │   │   ├── Documents/
 │   │   │   └── Documents/
 │   │   │       └── 0078-6200_V07 - 0078-6200_4MW Mk3E Setting and Adjustment of Relays.pdf
-│   │   └── VGA_guides/
-│   │       └── No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf
+│   │   │   └── VGA_guides/
+│   │   │       └── No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf
 │   └── Washing_Machine_Data/
 │       ├── Documents [PDF files]/
 │       └── Images [Extracted images]/
