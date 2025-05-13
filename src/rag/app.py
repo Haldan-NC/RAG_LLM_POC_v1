@@ -13,14 +13,14 @@ from src.utils.open_ai_utils import extract_json_from_open_ai_llm_output
 from src.llm_functions.cortex_llm_functions import vector_embedding_cosine_similarity_search
 from src.llm_functions.open_ai_llm_functions import extract_task_and_machine_name
 
-from src.rag.retriever import find_document_by_machine_name, narrow_down_relevant_chunks
+from src.rag.retriever import find_document_by_machine_name, narrow_down_relevant_chunks, get_best_document_for_machine
 from src.rag.generator import add_image_references_to_guide
 from src.rag.generator import create_step_by_step_prompt
 from src.utils.utils import log
 
 
 
-def main_RAG_pipeline(user_query: str, machine_name: str = "N/A" , verbose:int = 1) -> str:
+def main_RAG_pipeline(user_query: str, machine_name: str = "N/A", verbose: int = 1) -> str:
     log("Starting RAG pipeline...", level=0)
     log(f"User query: {user_query}", level=1)
     
@@ -28,19 +28,28 @@ def main_RAG_pipeline(user_query: str, machine_name: str = "N/A" , verbose:int =
     log(f"Extracted machine name: {machine_name}", level=1)
     log(f"Extracted task: {task}", level=1)
 
-    # log("Finding document ID in snowflake database...", level=1)
-    # document_info = find_document_by_machine_name(machine_name)
-    # log(f"Document ID: {document_info['DOCUMENT_ID']}", level=1)
-    # log(f"Document Name: {document_info['DOCUMENT_NAME']}", level=1)
+    # Use new document identification
+    document_info = get_best_document_for_machine(machine_name)
+    if not document_info:
+        log(f"No matching document found for machine: {machine_name}", level=0)
+        return f"Sorry, I couldn't find any documentation for the {machine_name} machine type."
+    
+    log(f"Found matching document: {document_info['DOCUMENT_NAME']}", level=1)
+    log(f"Document ID: {document_info['DOCUMENT_ID']}", level=1)
 
+    # Get relevant chunks
     log("Calling for Response 2: Finding most relevant chunks of data to solve the task...", level=1)
-    task_chunk_df = vector_embedding_cosine_similarity_search(input_text = task, chunk_size = "small", top_k = 20, similarity_threshold= 0.1)
+    task_chunk_df = vector_embedding_cosine_similarity_search(
+        input_text=task, 
+        chunk_size="small", 
+        top_k=20, 
+        similarity_threshold=0.1
+    )
 
-    # Filtering the task_chunk_df to only include chunks related to the found document
-    # log(f"Pre - Filtered task chunk dataframe: {len(task_chunk_df)}", level=1)
-    # filtered_task_chunk_df = narrow_down_relevant_chunks(task_chunk_df, document_info)
-    # log(f"Post - Filtered task chunk dataframe: {len(filtered_task_chunk_df)}", level=1)
-    filtered_task_chunk_df = task_chunk_df
+    # Filter chunks to only include those from the matched document
+    filtered_task_chunk_df = narrow_down_relevant_chunks(task_chunk_df, document_info)
+    log(f"Pre-filtered task chunk dataframe: {len(task_chunk_df)}", level=1)
+    log(f"Post-filtered task chunk dataframe: {len(filtered_task_chunk_df)}", level=1)
 
     # Retrieving a step by step response from the LLM using the relevant chunks
     instructions_3, reference_text_3 = create_step_by_step_prompt(filtered_task_chunk_df, task)
@@ -52,8 +61,8 @@ def main_RAG_pipeline(user_query: str, machine_name: str = "N/A" , verbose:int =
     log("Calling OpenAI API for Response 3...", level=1)
     response_3 = generate_promt_for_openai_api(
         instructions=instructions_3, 
-        input_text = reference_text_3
-        ).output_text
+        input_text=reference_text_3
+    ).output_text
 
     log("Response 3:", level=1)
     log(response_3, level=1)
