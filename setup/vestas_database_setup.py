@@ -48,7 +48,6 @@ def create_vestas_document_table() -> pd.DataFrame:
     """
     pdf_files_path = "data\\Vestas_RTP\\Documents\\Documents"
     document_rows = []
-    conn,cursor = get_cursor()
     
     documents_df = get_documents_table()
     if type(documents_df) == pd.DataFrame:
@@ -220,10 +219,10 @@ if __name__ == "__main__":
     # sections_df = create_vestas_sections_table()
 
     # # Create Images table
-    images_df = create_vestas_images_table()
+    # images_df = create_vestas_images_table()
 
     # Extract VGA Guide (seperate parser from other documents)
-    process_vga_guide()
+    # process_vga_guide()
 
     # Create a unified table for all chunks
-    create_vestas_unified_chunk_table()
+    # create_vestas_unified_chunk_table()

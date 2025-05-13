@@ -111,6 +111,30 @@ def write_to_table(df: pd.DataFrame, table_name: str) -> None:
         conn.close()
     
 
+# def prepare_documents_df(pdf_files_path: list) -> pd.DataFrame:
+#     """
+#     Prepares a DataFrame of documents used for ingestion for the Documents table.
+#     The reason this function is separate from the create_documents_table function is that the VGA guide is parsed seperately from the other documents.
+#     Args:
+#         pdf_files_path (str): Path to the directory containing PDF files.
+#     """
+#     document_rows = []
+#     for idx, filename in enumerate(os.listdir(pdf_files_path)):
+#         if filename.endswith(".pdf"):
+#             file_path = os.path.join(pdf_files_path, filename)
+#             log(f"Document number: {idx}  : {file_path}", level=1)
+#             file_size = os.path.getsize(file_path)
+            
+#             document_rows.append({
+#                 "DOCUMENT_NAME": filename,
+#                 "FILE_PATH": file_path,
+#                 "DOC_VERSION": "N/A",  # Placeholder, you can modify this printic as needed
+#                 "FILE_SIZE": file_size
+#             })
+
+#     documents_df = pd.DataFrame(document_rows)
+#     return documents_df
+
 def prepare_documents_df(pdf_files_path: list) -> pd.DataFrame:
     """
     Prepares a DataFrame of documents used for ingestion for the Documents table.
@@ -125,6 +149,16 @@ def prepare_documents_df(pdf_files_path: list) -> pd.DataFrame:
             log(f"Document number: {idx}  : {file_path}", level=1)
             file_size = os.path.getsize(file_path)
             
+
+            extract_OCR_meta_data()
+
+
+            extract_document_type()
+
+
+
+
+
             document_rows.append({
                 "DOCUMENT_NAME": filename,
                 "FILE_PATH": file_path,
@@ -134,6 +168,25 @@ def prepare_documents_df(pdf_files_path: list) -> pd.DataFrame:
 
     documents_df = pd.DataFrame(document_rows)
     return documents_df
+
+
+
+def extract_document_type(): 
+    pass 
+    
+
+def create_OCR_meta_data(): 
+    pass 
+
+
+
+
+
+
+
+
+
+
 
 
 def create_documents_table(pdf_files_path: str) -> None:
