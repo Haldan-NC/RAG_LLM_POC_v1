@@ -10,8 +10,8 @@ sys.path.append("..\\..\\.")
 from src.utils.open_ai_utils import generate_promt_for_openai_api
 from src.utils.open_ai_utils import extract_json_from_open_ai_llm_output
 
-from src.ingestion.llm_functions.cortex_llm_functions import vector_embedding_cosine_similarity_search
-from src.ingestion.llm_functions.open_ai_llm_functions import extract_task_and_machine_name
+from src.llm_functions.cortex_llm_functions import vector_embedding_cosine_similarity_search
+from src.llm_functions.open_ai_llm_functions import extract_task_and_machine_name
 
 from src.rag.retriever import find_document_by_machine_name, narrow_down_relevant_chunks
 from src.rag.generator import add_image_references_to_guide

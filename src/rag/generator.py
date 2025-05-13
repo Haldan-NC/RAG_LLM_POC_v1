@@ -54,7 +54,7 @@ def add_image_references_to_guide(guide_text: str, filtered_task_chunk_df: pd.Da
         """, 
         input_text = user_query
         )
-
+    conn.close()
     return response.output_text
 
 

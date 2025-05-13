@@ -23,8 +23,9 @@ This proof-of-concept establishes a structured foundation for ongoing developmen
    pip install -r requirements.txt
    ```
 
-3. **Create a directory in `data` called `Vestas_RTP/Documents`**
-   - Place "No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf" in there.  
+3. **Create a directories in `data` called `Vestas_RTP/Documents/Documents` and `Vestas_RTP/Documents/VGA_guides`**
+   - Place "No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf" in the VGA_guides folder.
+   - Place "0078-6200_V07 - 0078-6200_4MW Mk3E Setting and Adjustment of Relays.pdf" in the Documents folder.
    - **Note:** The PDF files are not included in the repository.
    - **Note:** The pipeline is currently only designed to work with the VGA guide! Using other documents will break the pipeline!
    - **Do not commit the PDF files to the repository.**  
@@ -34,8 +35,11 @@ This proof-of-concept establishes a structured foundation for ongoing developmen
      └── data/
          └── Vestas_RTP/
              └── Documents/
-                 ├── No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf
-                 └── ...
+                 ├── Documents/
+                 |   └── 0078-6200_V07 - 0078-6200_4MW Mk3E Setting and Adjustment of Relays.pdf
+                 └── VGA_guides/
+                    └── No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf
+
      ```
 
 4. **Do not alter** `connection_config.yaml` _(see section 5)_.  
@@ -89,6 +93,9 @@ This proof-of-concept establishes a structured foundation for ongoing developmen
    python tests/T.B.D
    ```
 
+4. **Change the verbosity_level in `config/log_config.yaml` for detailed logging.**  
+
+
 ---
 
 ### 3. Project Structure
@@ -98,26 +105,25 @@ RAG_LLM_POC_v1/
 ├── config/
 │   ├── connection_config.yaml
 │   └── log_config.yaml
-├── docs/
 ├── setup/
-│   ├── washing_machine_database_setup.py
 │   └── vestas_database_setup.py
 ├── data/
-│   ├── Washing_Machine_Data
-│   │   ├── Documents [PDF files]
-│   │   └── Images [Extracted images]
-│   └── Washing_Machine_Data
-│       ├── Documents [PDF files]
-│       └── Images [Extracted images]
+│   └── Vestas_RTP/
+│       └── Documents/
+│           ├── Documents/
+│           |   └── 0078-6200_V07 - 0078-6200_4MW Mk3E Setting and Adjustment of Relays.pdf
+│           └── VGA_guides/
+│               └── No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf
 ├── src/
 │   ├── db/
 │   │   └── db_functions.py
 │   ├── ingestion/
 │   │   ├── image_extractor.py
 │   │   ├── pdf_parser.py
-│   │   └── llm_functions/
-│   │       ├── cortex_llm_functions.py
-│   │       └── openai_llm_functions.py
+│   │   ├── vga_pdf_parser.py
+│   ├── llm_functions/
+│   │   ├── cortex_llm_functions.py
+│   │   └── openai_llm_functions.py
 │   ├── rag/
 │   │   ├── app.py
 │   │   ├── generator.py
@@ -130,11 +136,11 @@ RAG_LLM_POC_v1/
     └── readme.txt
 ```
 
-- **setup/**: Database-initialization scripts (currently for a washing-machine example; replace with Vestas data).  
+- **setup/**: Database-initialization scripts. 
 - **data/**: Source PDFs and their extracted images.  
 - **src/db/**: Functions for Snowflake integration.  
 - **src/ingestion/**: ETL and ingestion logic, including `llm_functions/`.  
-- **src/rag/**: Retrieval-Augmented Generation pipeline entry point.  
+- **src/rag/**: Retrieval-Augmented Generation pipeline.  
 - **src/utils/**: Shared utility code.  
 - **tests/**: Test pipelines for performance and benchmarking.  
 - **config/**: Connection files for windows credential manager (e.g. `connection_config.yaml`), replaceable with Azure Key Vault or environment variables in the future.

@@ -3,10 +3,13 @@ import os
 import numpy as np
 import pandas as pd
 from PIL import Image, ImageDraw
+from PIL import UnidentifiedImageError
+import io
 import cv2
 from shapely.geometry import box
 from shapely.ops import unary_union
 import sys
+
 sys.path.append("..\\.")  
 sys.path.append("..\\..\\.") 
 sys.path.append("..\\..\\..\\.") 
@@ -74,6 +77,38 @@ def crop_regions_from_image(page_image: Image.Image, regions: list, output_dir: 
         cropped.save(path)
         metadata.setdefault(page_num, {})[i] = {'page':page_num,'image_path':path,'coords':coords}
     return metadata
+
+
+def extract_images_from_page(page: fitz.Page, page_num: int, image_path: str) -> list:
+    """
+    Extracts images from a given page of a PDF document.
+    The page object must be from pdfplumber. (import pdfplumber)
+
+    needs to be replaced with previous image extraction method.
+
+    Args:
+        page (fitz.Page): The page object from which to extract images.
+        page_num (int): The page number.
+    """
+    images = page.images
+    images_path_list = []
+
+    image_path = image_path.replace(".pdf", "").replace("Documents\\VGA_guides", "Images")
+    if not os.path.exists(image_path):
+        os.makedirs(image_path, exist_ok=True)
+
+    for i, img in enumerate(images):
+        image_dest = os.path.join(image_path, f"page_{page_num}_image_{i}.png")
+        stream = img["stream"]
+        image_bytes = stream.get_data()  # raw image bytes
+        try:
+            image = Image.open(io.BytesIO(image_bytes))
+            image.save(image_dest)
+            images_path_list.append(image_dest)
+        except UnidentifiedImageError:
+            pass
+    return images_path_list
+
 
 
 def extract_images_from_pdf(pdf_path: str, manual_id: int, output_dir: str, verbose: int=0) -> dict:

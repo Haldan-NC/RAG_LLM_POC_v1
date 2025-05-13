@@ -43,10 +43,11 @@ def vector_embedding_cosine_similarity_search(input_text: str, chunk_size: str =
         ORDER BY COSINE_SIMILARITY DESC
         LIMIT {top_k}
     """
-
+    
     cursor.execute(sql, (input_text,))
     return_df = cursor.fetch_pandas_all()
-
+    conn.close()
+    
     return return_df
 
 
@@ -77,7 +78,7 @@ def vector_embedding_cosine_similarity_between_texts(text1: str, text2: str) -> 
 
     cursor.execute(sql, (text1, text2))
     result_df = cursor.fetch_pandas_all()
-
+    conn.close()
     return result_df['COSINE_SIMILARITY'].iloc[0]
 
 
@@ -134,5 +135,6 @@ def extract_TOC_cortex(text: str, model : str = 'llama3.1-70b') -> str:
         SELECT SNOWFLAKE.CORTEX.COMPLETE('{model}', $$ {prompt} $$)
     """)
     log(f"Runtime in seconds: {time.time() - start_time:.4f}", level=1)
-
-    return cursor.fetch_pandas_all().iloc[0,0]
+    answer = cursor.fetch_pandas_all().iloc[0,0]
+    conn.close()
+    return answer

@@ -1,4 +1,9 @@
-# Verbosity levels have values 0, 1, or 2.
+# Verbosity levels have values 0, 1, 2, or 3
 # Verbosity levels will dictate the amount of terminal output will be displayed
+
+# Level 0: Readio Silence - No terminal output
+# Level 1: Step of the over all process, E.G Table uploads/creations, finilized parsing, etc.
+# Level 2: Output specific to sub processes E.G
+# Level 3: Output that is useful while debugging / Spam E.G vga_pdf_parser logging multiple variables for each step in a guide.
 
 verbosity_level: 1
