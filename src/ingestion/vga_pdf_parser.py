@@ -57,8 +57,6 @@ def string_hardcoded_bandaid(text: str, real_page_num: int) -> str:
     elif real_page_num == 281:
         if text == '630-16-\nW5 cable':
             text = ''
-        # elif text == 'Error on\nASDS':
-        #     text = ''
 
     elif real_page_num == 482:
         if text == 'sensor\ncable':
@@ -100,16 +98,36 @@ def exception_switch(real_page_num: int) -> bool:
     return False
 
 
-def table_of_interest_index(real_page_num: int) -> int:
+def table_of_interest_index(real_page_num: int, table_of_interest: int) -> int:
     """
-    This function is used to skip certain pages that are not relevant for the process of which it is found.
-    Defaults to 0, but can be set to 1 for specific pages.
+    This function is used to define the table index on pages where the guid step and explanation table is on the same page as the overview table.
+    
+    The variable table_of_interest should be either 0 or 1, depneding on whether the guide overview description
+    is on the page. If it is, then the table_of_interest should be 1, otherwise it should be 0.
+    The above mentioned naturally assumes that each guide overview:
+        1. is extracted as a table
+        2. does not contain subtables
 
-    This is another hardcoded bandaid for the specific document.
+    In the cases below, the above mentioned assumptions are not met, and the table_of_interest is altered.
+
     """
-    if real_page_num in [612, 653, 742, 749]:
-        return 1
-    return 0
+    # Add pages here IFF:
+    # 1. The guide overview is on the page
+    # 2. The table of interest IS on the page
+    if real_page_num in [12]:
+        # 3. The guide overview table is not recognized as a table
+        return 0
+
+    if real_page_num in [148]:
+        # 3. The guide overview contains sub tables, making the table of interest index 3.
+        return 3
+
+    # 2. The table of interest IS NOT on the page
+    if real_page_num in [277]: 
+        # 3. There are more than 1 tables extracted on the page
+        return 99
+
+    return table_of_interest
 
 
 def extract_step_and_explanation_from_row(row: list) -> tuple:
@@ -191,7 +209,7 @@ def add_explanation_to_guide(current_guide: dict, step_num: int, explanation: st
     return current_guide
 
 
-def extract_vga_guide(file_path: str, document_id: int) -> list:
+def extract_vga_guide(file_path: str) -> list:
     """
     Extracts the contant from the VGA guide and returns a dataframe with the content. 
     
@@ -209,18 +227,20 @@ def extract_vga_guide(file_path: str, document_id: int) -> list:
         pd.DataFrame: DataFrame containing the extracted content.
     """
     guides = []
-    # SuppressStderr() is added to suppress the warnings from pdfplumber. "CropBox missing from /Page, defaulting to MediaBox"
+    # SuppressStderr() is added to suppress the warnings from pdfplumber. "CropBox missing from /Page, defaulting to MediaBox". Also supresses other standard output.
     with SuppressStderr():
         with pdfplumber.open(file_path) as pdf:
             pdf_document = list(pdf.pages)  # Load all pages into a list
 
             guide_active = False
             current_guide = None
-            # TQDM doesn't work with SuppressStderr(). 
-            for page_idx, page in tqdm(enumerate(pdf_document), desc="Processing pages of VGA guide", unit="page", total=len(pdf_document)):
-                real_page_num = page_idx + 1
+            table_of_interest = 0
 
-                # Added to show some form of progress during extraction
+            for page_idx, page in enumerate(pdf_document):
+                real_page_num = page_idx + 1
+                step_and_expl_extracted = False
+
+                # Added to terminal output to show progress of the extraction.
                 if (real_page_num% 150 == 0) or (real_page_num == len(pdf_document)):
                     log(f"  VGA guide extraction progress: {real_page_num}/{len(pdf_document)} pages", level = 1)
 
@@ -229,12 +249,14 @@ def extract_vga_guide(file_path: str, document_id: int) -> list:
 
                 images_list = extract_images_from_page(page = page, page_num = real_page_num, image_path = file_path)
 
-                # === Check for guide start ===
+                # Check for guide start. The only thing that all guide overview pages has is common is the "Guide Name" text.
                 if "Guide Name" in text:
                     if current_guide is not None:
                         guides.append(current_guide)
                         log(f"  Extracted VGA guide nr. {len(guides)} from page {current_guide["steps"][1]["page_number"][0]} - {\
                             current_guide["steps"][step_num]["page_number"][-1]}", level = 2)
+
+                    table_of_interest = 1
 
                     guide_active = True
                     current_guide = {
@@ -242,77 +264,80 @@ def extract_vga_guide(file_path: str, document_id: int) -> list:
                         "text": text,
                         "steps": {}
                     }
+                
+                else:
+                    table_of_interest = 0
 
-                # === If we're in a guide context and haven't filled in steps yet ===
-                if guide_active and current_guide is not None:
-                    found_valid_table = False
-                    
-                    table_of_interest = table_of_interest_index(real_page_num = real_page_num)
-                    for table_idx,table in enumerate(tables): # We are only interested in the first table on the page
-                        if table_of_interest == table_idx:
+                if real_page_num == 12:
+                    print("")
 
-                            # I will find a better solution than this loop in the future. Its very bad. 
-                            if table[0][0] == "Error Text:": # skipping past this table.
-                                for i,__table in enumerate(tables):
-                                    for j,row in enumerate(__table):
-                                        for k,item in enumerate(row):
-                                            if item != None:
-                                                item = string_hardcoded_bandaid(text = item, real_page_num = real_page_num)
-                                                if "Step" in item.replace(" ", "") or "Explanation" in item.replace(" ", ""): 
-                                                    found_valid_table = True
-                                                    if item == "Step": # One example on page 148 is the cause of this logic
-                                                        table = __table # Replace the table with the one that has "Step" in it
-                                                        table[j][k] = "Step" # Replace the "S tep" with "Step"
-                                                    break
-                                if not found_valid_table:
-                                    log(f"--> Skipping table on page {real_page_num} as it is not a step table", level = 3)
-                                    continue
-                                
-                            for row in table:
-                                log(f"\n  --  page {real_page_num}  --  ", level = 3)
+                # The Table of interest index is used on 3 exceptions, where the rule based flow of the guide overview page is not working as expected.
+                # More info in the doc string.
+                table_of_interest = table_of_interest_index(real_page_num = real_page_num, 
+                                                            table_of_interest = table_of_interest)
 
-                                row = [string_hardcoded_bandaid(text = x, real_page_num = real_page_num) for x in row if 
-                                        string_hardcoded_bandaid(text = x, real_page_num = real_page_num) not in [None,"",'']]
-                                        
-                                if "Step" in row and "Explanation" in row:
-                                    log(f"--> Found step table on page {real_page_num}", level = 3)
-                                    found_valid_table = True
-                                    continue
+                for table_idx, table in enumerate(tables): # We are only interested in the first table on the page
+                    if step_and_expl_extracted:
+                        # This should include the logic to extract DMS No. and add it to the current step.
+                        # Any tables after the table with the step and explanation are sub tables.
+                        # For now we skip the rest of the tables on the page.
+                        continue
 
-                                step_label, explanation = extract_step_and_explanation_from_row(row = row)
-                                        
-                                if step_label in ['',"", None] and (explanation not in ['',"", None] or len(images_list)> 0):
-                                    if not exception_switch(real_page_num): # Defaults to False, unless an exception is made.
-                                        current_guide = add_explanation_to_guide(
-                                            current_guide = current_guide,
-                                            step_num = step_num,
-                                            explanation = explanation,
-                                            real_page_num = real_page_num,
-                                            images_list = images_list
-                                        )
-                                        
+                    if table_of_interest == table_idx:
+                        for row in table:
+                            log(f"\n  --  page {real_page_num}  --  ", level = 3)
 
-                                elif step_label not in ['',"", None] and explanation not in ['',"", None]:
-                                    if not exception_switch(real_page_num): # Defaults to False, unless an exception is made.
-                                        step_label, step_num = get_step_num_and_label(step_label = step_label,
-                                                                            real_page_num = real_page_num
-                                        )   
+                            row = [string_hardcoded_bandaid(text = x, real_page_num = real_page_num) for x in row if 
+                                    string_hardcoded_bandaid(text = x, real_page_num = real_page_num) not in [None,"",'']]
+                                    
+                            if "Step" in row and "Explanation" in row:
+                                log(f"--> Found step table on page {real_page_num}", level = 3)
+                                step_and_expl_extracted = True
+                                # Continue to the next row, to avoid writing "Step" and "Explanation" to the dictionary.
+                                continue
 
-                                        current_guide = add_step_and_explanation_to_guide(
-                                            current_guide = current_guide,
-                                            step_label = step_label,
-                                            step_num = step_num,
-                                            explanation = explanation,
-                                            real_page_num = real_page_num,
-                                            images_list = images_list
-                                        )
-                                else: 
-                                    log("---> No valid step or explanation found", level = 3)
-            
+                            step_label, explanation = extract_step_and_explanation_from_row(row = row)
+                                    
+                            if step_label in ['',"", None] and (explanation not in ['',"", None] or len(images_list)> 0):
+                                if not exception_switch(real_page_num): # Defaults to False, unless an exception is made.
+                                    current_guide = add_explanation_to_guide(
+                                        current_guide = current_guide,
+                                        step_num = step_num,
+                                        explanation = explanation,
+                                        real_page_num = real_page_num,
+                                        images_list = images_list
+                                    )
+                                    step_and_expl_extracted = True
+
+                                    
+
+                            elif step_label not in ['',"", None] and explanation not in ['',"", None]:
+                                if not exception_switch(real_page_num): # Defaults to False, unless an exception is made.
+                                    step_label, step_num = get_step_num_and_label(step_label = step_label,
+                                                                        real_page_num = real_page_num
+                                    )   
+
+                                    current_guide = add_step_and_explanation_to_guide(
+                                        current_guide = current_guide,
+                                        step_label = step_label,
+                                        step_num = step_num,
+                                        explanation = explanation,
+                                        real_page_num = real_page_num,
+                                        images_list = images_list
+                                    )
+                                step_and_expl_extracted = True
+
+                            else: 
+                                log("---> No valid step or explanation found", level = 3)
+        
         return guides
 
 
 def expand_mk_range(mk_str: str) -> list:
+    """
+    Expands a string representing a range of MK numbers into a list of individual MK numbers. 
+    Is used to define the wind turbine models for each guide.
+    """
     match = re.match(r'MK(\d+)-(\d+)', mk_str)
     if match:
         start, end = int(match.group(1)), int(match.group(2))
@@ -320,14 +345,24 @@ def expand_mk_range(mk_str: str) -> list:
     else:
         return [mk_str]
 
+
 def normalize_generator(g: str) -> str:
+    """
+    There are inconsistencies with the use of , and . in the machine model string. 
+    This is likely due to a max of danish and english speaking people creating the document.
+    """
     return g.replace(',', '.').strip()
 
+
 def extract_machines(s: str) -> set:
+    """
+    Extracts the machine models from the given string.
+    The string is expected to contain segments that look like: "V105 V112 ... 3-4,2MW MK0-3".
+    The function uses regex and black magic to find the segments and extract the machine models.
+    """
     # Split string into segments ending in a generation spec
     # Each segment should look like: "V105 V112 ... 3-4,2MW MK0-3"
     segments = re.findall(r'(?:V\d+\s+)+(?:[\d.,/-]+MW)\s+MK[\d\-]+', s)
-
     machines = set()
 
     for segment in segments:
@@ -343,7 +378,6 @@ def extract_machines(s: str) -> set:
 
         for frame in frames:
             for mk in generations:
-                # add a string to the set
                 machines.add(f"{frame} {generator_str} {mk}")
 
     return sorted(machines)
@@ -534,4 +568,10 @@ def create_vga_guide_substeps_dataframe(guides: list, guides_df: pd.DataFrame) -
     
 
 if __name__ == "__main__":
-    pass
+    
+    file_path = "data\\Vestas_RTP\\Documents\\VGA_guides\\No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf"
+    guides = extract_vga_guide(file_path)
+
+    # guides_df = get_table(table_name = "VGA_GUIDES")
+    # steps_df = create_vga_guide_steps_dataframe(guides = guides, guides_df = guides_df)
+
