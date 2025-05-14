@@ -82,7 +82,6 @@ def string_hardcoded_bandaid(text: str, real_page_num: int) -> str:
         if text == 'Q1 circuit\nconnection':
             text = ''
 
-
     return text
 
 
@@ -184,10 +183,118 @@ def add_step_and_explanation_to_guide(current_guide: dict, step_label: str, step
         "step_label": step_label.replace("\n", " "),
         "explanation": [explanation.replace("\n", " \n ")],
         "page_number": [real_page_num],
-        "images": [images_list]
+        "images": [images_list],
+        "DMS No.": []
     }
     log(f"   Added step: {step_num}   explanation: {explanation[:30].replace("\n","")}...   images: {len(images_list)}", level = 3)
     return current_guide
+
+
+def extract_dms_no_from_table(table: list) -> dict:
+    """
+    This function is used to extract the DMS No. from a table.
+    Args:
+        table (list): The table containing the DMS No.
+
+    """
+    extract_rows = False
+    dms_no_list = []
+    for i,row in enumerate(table):
+        if extract_rows:
+            item_num = len(dms_no_list)
+            dms_no_list.append({
+                "DMS No.": row[idx_dms_no],
+                "Description": row[idx_description]
+            })
+
+        if "DMS No." in row and "Description" in row:
+            extract_rows = True
+            for j,item in enumerate(row):
+                if item == None: 
+                    continue
+                elif "DMS No." in item:
+                    idx_dms_no = j
+                elif "Description" in item:
+                    idx_description = j
+
+    return dms_no_list
+
+
+def extract_links_from_page(real_page_num: int, file_path: str, dms_no_list: list) -> list:
+    """
+    Extracts hyperlinks from a PDF page and returns a new dms_no_list with hyperlinks.
+    Args:
+        real_page_num (int): The page number of the PDF document.
+        file_path (str): The path to the PDF file.
+    """
+    doc = fitz.open(file_path)
+    results = []
+    page = doc[real_page_num-1] # it's 0 indexed
+    links = page.get_links()
+    text_dms_list = [dms_no["DMS No."] for dms_no in dms_no_list]
+    
+    for link in links:
+        uri = link.get("uri")
+        rect = link.get("from", None)
+        text = page.get_textbox(rect).strip()
+        if uri != None: 
+            if text in text_dms_list:
+                link_details = {
+                    "text":  text,
+                    "hyperlink": uri
+                }
+                results.append(link_details)
+    
+    # Ensured that the hyperlinks are in the same order as the DMS No. list.
+    new_results = []
+    for i, dms_no in enumerate(dms_no_list):
+        for j, link in enumerate(results):
+            if dms_no["DMS No."] == link["text"]:
+                new_results.append({
+                    "DMS No.": dms_no["DMS No."],
+                    "Description": dms_no["Description"],
+                    "hyperlink": link["hyperlink"]
+                })
+                break
+
+    return new_results
+
+
+def add_dms_no_to_current_guide(current_guide: dict, dms_no_list: list, real_page_number: int) -> dict:
+    """
+    This function adds the DMS No. to the current guide. 
+    
+    Known issue 1:
+    The given list of tables which is iterated over does not nest the DMS No. table.
+    What that means, is that if two DMS No. tables are on the same page, the function will add both the DMS No. tables to both steps.
+    Page 77 (step 22 and 23) is an example of this.
+
+    Known issue 2:
+    If a DMS No. table spans 2 pages, the function will only add the DMS No. table on the first page. An example of this is page 273-274 (step 6).
+
+    Args:
+        current_guide (dict): The current guide to which the DMS No. will be added.
+        dms_no_list (list): The list of DMS No. to be added.
+        real_page_number (int): The real page number of the document.
+        hyper_links (list): The list of hyperlinks associated with the DMS No. table.
+
+    Returns:
+        current_guide (dict): The current guide with the DMS No. added.
+    """
+    for step in current_guide["steps"]:
+        for page_idx, step_page in enumerate(current_guide["steps"][step]["page_number"]):
+            if step_page == real_page_number:
+                if "Relevant documentation" in current_guide["steps"][step]["explanation"][page_idx]:
+                    current_guide["steps"][step]["DMS No."] += dms_no_list
+                    log(f"---> Added DMS No. to step: {step}  on page: {real_page_number}   DMS No:{dms_no_list}", level = 3)
+                    if real_page_number == 273:
+                        print("")
+                    print("")
+
+                    break
+
+    return current_guide
+
 
 
 def add_explanation_to_guide(current_guide: dict, step_num: int, explanation: str, real_page_num: int, images_list: list) -> dict:
@@ -268,9 +375,6 @@ def extract_vga_guide(file_path: str) -> list:
                 else:
                     table_of_interest = 0
 
-                if real_page_num == 12:
-                    print("")
-
                 # The Table of interest index is used on 3 exceptions, where the rule based flow of the guide overview page is not working as expected.
                 # More info in the doc string.
                 table_of_interest = table_of_interest_index(real_page_num = real_page_num, 
@@ -278,10 +382,15 @@ def extract_vga_guide(file_path: str) -> list:
 
                 for table_idx, table in enumerate(tables): # We are only interested in the first table on the page
                     if step_and_expl_extracted:
-                        # This should include the logic to extract DMS No. and add it to the current step.
                         # Any tables after the table with the step and explanation are sub tables.
-                        # For now we skip the rest of the tables on the page.
-                        continue
+                        # The add_dms_no_to_current_guide function is used to add the DMS No. to the current guide.
+                        dms_no_list = extract_dms_no_from_table(table = table)
+                        dms_no_list = extract_links_from_page(real_page_num = real_page_num, file_path = file_path, dms_no_list= dms_no_list)
+                        current_guide = add_dms_no_to_current_guide(
+                            current_guide = current_guide,
+                            dms_no_list = dms_no_list,
+                            real_page_number = real_page_num
+                        )
 
                     if table_of_interest == table_idx:
                         for row in table:
@@ -331,6 +440,17 @@ def extract_vga_guide(file_path: str) -> list:
                                 log("---> No valid step or explanation found", level = 3)
         
         return guides
+
+
+
+
+
+
+
+
+
+
+
 
 
 def expand_mk_range(mk_str: str) -> list:
@@ -572,6 +692,6 @@ if __name__ == "__main__":
     file_path = "data\\Vestas_RTP\\Documents\\VGA_guides\\No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf"
     guides = extract_vga_guide(file_path)
 
-    # guides_df = get_table(table_name = "VGA_GUIDES")
+    guides_df = get_table(table_name = "VGA_GUIDES")
     # steps_df = create_vga_guide_steps_dataframe(guides = guides, guides_df = guides_df)
 
