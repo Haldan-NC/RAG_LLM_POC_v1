@@ -3,3 +3,4 @@ data/Washing_Machine_Data/Images/
 /src/rag/__pycache__
 *.pyc
 data/Vestas_RTP/
+*.pickle

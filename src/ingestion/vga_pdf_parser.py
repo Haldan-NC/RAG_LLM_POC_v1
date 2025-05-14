@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw
 from PIL import UnidentifiedImageError
 import io
 from tqdm import tqdm
+import pickle
 
 import sys
 sys.path.append(".")  
@@ -17,10 +18,12 @@ sys.path.append("..\\.")
 sys.path.append("..\\..\\.") 
 
 from src.utils.utils import get_connection_config, log
-from src.utils.utils import SuppressStderr
+from src.utils.utils import SuppressStderr, check_cache_exists
 from src.ingestion.image_extractor import extract_images_from_page
 from src.db.db_functions import prepare_documents_df, write_to_table, get_documents_table
 from src.db.db_functions import create_vga_guide_table, create_vga_guide_steps_table, create_vga_guide_substeps_table
+from src.db.db_functions import create_wind_turbine_table, create_link_table__guide_id__turbine_id
+from src.db.db_functions import create_link_table__step_id__dms_no
 from src.db.db_functions import get_table
 
 
@@ -287,14 +290,9 @@ def add_dms_no_to_current_guide(current_guide: dict, dms_no_list: list, real_pag
                 if "Relevant documentation" in current_guide["steps"][step]["explanation"][page_idx]:
                     current_guide["steps"][step]["DMS No."] += dms_no_list
                     log(f"---> Added DMS No. to step: {step}  on page: {real_page_number}   DMS No:{dms_no_list}", level = 3)
-                    if real_page_number == 273:
-                        print("")
-                    print("")
-
                     break
 
     return current_guide
-
 
 
 def add_explanation_to_guide(current_guide: dict, step_num: int, explanation: str, real_page_num: int, images_list: list) -> dict:
@@ -316,6 +314,8 @@ def add_explanation_to_guide(current_guide: dict, step_num: int, explanation: st
     return current_guide
 
 
+
+
 def extract_vga_guide(file_path: str) -> list:
     """
     Extracts the contant from the VGA guide and returns a dataframe with the content. 
@@ -333,124 +333,117 @@ def extract_vga_guide(file_path: str) -> list:
     Returns:
         pd.DataFrame: DataFrame containing the extracted content.
     """
-    guides = []
-    # SuppressStderr() is added to suppress the warnings from pdfplumber. "CropBox missing from /Page, defaulting to MediaBox". Also supresses other standard output.
-    with SuppressStderr():
-        with pdfplumber.open(file_path) as pdf:
-            pdf_document = list(pdf.pages)  # Load all pages into a list
 
-            guide_active = False
-            current_guide = None
-            table_of_interest = 0
+    if check_cache_exists(file_path = "data\\Vestas_RTP\\Cache\\vga_guides.pickle"):
+        return load_cached_guides()
+        
+    else:
+        guides = []
+        # SuppressStderr() is added to suppress the warnings from pdfplumber. "CropBox missing from /Page, defaulting to MediaBox". Also supresses other standard output.
+        with SuppressStderr():
+            with pdfplumber.open(file_path) as pdf:
+                pdf_document = list(pdf.pages)  # Load all pages into a list
 
-            for page_idx, page in enumerate(pdf_document):
-                real_page_num = page_idx + 1
-                step_and_expl_extracted = False
+                guide_active = False
+                current_guide = None
+                table_of_interest = 0
 
-                # Added to terminal output to show progress of the extraction.
-                if (real_page_num% 150 == 0) or (real_page_num == len(pdf_document)):
-                    log(f"  VGA guide extraction progress: {real_page_num}/{len(pdf_document)} pages", level = 1)
+                for page_idx, page in enumerate(pdf_document):
+                    real_page_num = page_idx + 1
+                    step_and_expl_extracted = False
 
-                text = page.extract_text() or ""
-                tables = page.extract_tables()
+                    # Added to terminal output to show progress of the extraction.
+                    if (real_page_num% 150 == 0) or (real_page_num == len(pdf_document)):
+                        log(f"  VGA guide extraction progress: {real_page_num}/{len(pdf_document)} pages", level = 1)
 
-                images_list = extract_images_from_page(page = page, page_num = real_page_num, image_path = file_path)
+                    text = page.extract_text() or ""
+                    tables = page.extract_tables()
 
-                # Check for guide start. The only thing that all guide overview pages has is common is the "Guide Name" text.
-                if "Guide Name" in text:
-                    if current_guide is not None:
-                        guides.append(current_guide)
-                        log(f"  Extracted VGA guide nr. {len(guides)} from page {current_guide["steps"][1]["page_number"][0]} - {\
-                            current_guide["steps"][step_num]["page_number"][-1]}", level = 2)
+                    images_list = extract_images_from_page(page = page, page_num = real_page_num, image_path = file_path)
 
-                    table_of_interest = 1
+                    # Check for guide start. The only thing that all guide overview pages has is common is the "Guide Name" text.
+                    if "Guide Name" in text:
+                        if current_guide is not None:
+                            guides.append(current_guide)
+                            log(f"  Extracted VGA guide nr. {len(guides)} from page {current_guide["steps"][1]["page_number"][0]} - {\
+                                current_guide["steps"][step_num]["page_number"][-1]}", level = 2)
 
-                    guide_active = True
-                    current_guide = {
-                        "page_number": real_page_num,
-                        "text": text,
-                        "steps": {}
-                    }
-                
-                else:
-                    table_of_interest = 0
+                        table_of_interest = 1
+                        current_guide = {
+                            "page_number": real_page_num,
+                            "text": text,
+                            "steps": {}
+                        }
+                    
+                    else:
+                        table_of_interest = 0
 
-                # The Table of interest index is used on 3 exceptions, where the rule based flow of the guide overview page is not working as expected.
-                # More info in the doc string.
-                table_of_interest = table_of_interest_index(real_page_num = real_page_num, 
-                                                            table_of_interest = table_of_interest)
+                    # The Table of interest index is used on 3 exceptions, where the rule based flow of the guide overview page is not working as expected.
+                    # More info in the doc string.
+                    table_of_interest = table_of_interest_index(real_page_num = real_page_num, 
+                                                                table_of_interest = table_of_interest)
 
-                for table_idx, table in enumerate(tables): # We are only interested in the first table on the page
-                    if step_and_expl_extracted:
-                        # Any tables after the table with the step and explanation are sub tables.
-                        # The add_dms_no_to_current_guide function is used to add the DMS No. to the current guide.
-                        dms_no_list = extract_dms_no_from_table(table = table)
-                        dms_no_list = extract_links_from_page(real_page_num = real_page_num, file_path = file_path, dms_no_list= dms_no_list)
-                        current_guide = add_dms_no_to_current_guide(
-                            current_guide = current_guide,
-                            dms_no_list = dms_no_list,
-                            real_page_number = real_page_num
-                        )
+                    for table_idx, table in enumerate(tables): # We are only interested in the first table on the page
+                        if step_and_expl_extracted:
+                            # Any tables after the table with the step and explanation are sub tables.
+                            # The add_dms_no_to_current_guide function is used to add the DMS No. to the current guide.
+                            dms_no_list = extract_dms_no_from_table(table = table)
+                            dms_no_list = extract_links_from_page(real_page_num = real_page_num, file_path = file_path, dms_no_list= dms_no_list)
+                            current_guide = add_dms_no_to_current_guide(
+                                current_guide = current_guide,
+                                dms_no_list = dms_no_list,
+                                real_page_number = real_page_num
+                            )
 
-                    if table_of_interest == table_idx:
-                        for row in table:
-                            log(f"\n  --  page {real_page_num}  --  ", level = 3)
+                        if table_of_interest == table_idx:
+                            for row in table:
+                                log(f"\n  --  page {real_page_num}  --  ", level = 3)
 
-                            row = [string_hardcoded_bandaid(text = x, real_page_num = real_page_num) for x in row if 
-                                    string_hardcoded_bandaid(text = x, real_page_num = real_page_num) not in [None,"",'']]
-                                    
-                            if "Step" in row and "Explanation" in row:
-                                log(f"--> Found step table on page {real_page_num}", level = 3)
-                                step_and_expl_extracted = True
-                                # Continue to the next row, to avoid writing "Step" and "Explanation" to the dictionary.
-                                continue
+                                row = [string_hardcoded_bandaid(text = x, real_page_num = real_page_num) for x in row if 
+                                        string_hardcoded_bandaid(text = x, real_page_num = real_page_num) not in [None,"",'']]
+                                        
+                                if "Step" in row and "Explanation" in row:
+                                    log(f"--> Found step table on page {real_page_num}", level = 3)
+                                    step_and_expl_extracted = True
+                                    # Continue to the next row, to avoid writing "Step" and "Explanation" to the dictionary.
+                                    continue
 
-                            step_label, explanation = extract_step_and_explanation_from_row(row = row)
-                                    
-                            if step_label in ['',"", None] and (explanation not in ['',"", None] or len(images_list)> 0):
-                                if not exception_switch(real_page_num): # Defaults to False, unless an exception is made.
-                                    current_guide = add_explanation_to_guide(
-                                        current_guide = current_guide,
-                                        step_num = step_num,
-                                        explanation = explanation,
-                                        real_page_num = real_page_num,
-                                        images_list = images_list
-                                    )
+                                step_label, explanation = extract_step_and_explanation_from_row(row = row)
+                                        
+                                if step_label in ['',"", None] and (explanation not in ['',"", None] or len(images_list)> 0):
+                                    if not exception_switch(real_page_num): # Defaults to False, unless an exception is made.
+                                        current_guide = add_explanation_to_guide(
+                                            current_guide = current_guide,
+                                            step_num = step_num,
+                                            explanation = explanation,
+                                            real_page_num = real_page_num,
+                                            images_list = images_list
+                                        )
+                                        step_and_expl_extracted = True
+
+                                elif step_label not in ['',"", None] and explanation not in ['',"", None]:
+                                    if not exception_switch(real_page_num): # Defaults to False, unless an exception is made.
+                                        step_label, step_num = get_step_num_and_label(step_label = step_label,
+                                                                            real_page_num = real_page_num
+                                        )   
+
+                                        current_guide = add_step_and_explanation_to_guide(
+                                            current_guide = current_guide,
+                                            step_label = step_label,
+                                            step_num = step_num,
+                                            explanation = explanation,
+                                            real_page_num = real_page_num,
+                                            images_list = images_list
+                                        )
                                     step_and_expl_extracted = True
 
-                                    
+                                else: 
+                                    log("---> No valid step or explanation found", level = 3)
+            
+            log(f"  Extracted {len(guides)} guides from the VGA guide", level = 1)
+            cache_guides(guides)
 
-                            elif step_label not in ['',"", None] and explanation not in ['',"", None]:
-                                if not exception_switch(real_page_num): # Defaults to False, unless an exception is made.
-                                    step_label, step_num = get_step_num_and_label(step_label = step_label,
-                                                                        real_page_num = real_page_num
-                                    )   
-
-                                    current_guide = add_step_and_explanation_to_guide(
-                                        current_guide = current_guide,
-                                        step_label = step_label,
-                                        step_num = step_num,
-                                        explanation = explanation,
-                                        real_page_num = real_page_num,
-                                        images_list = images_list
-                                    )
-                                step_and_expl_extracted = True
-
-                            else: 
-                                log("---> No valid step or explanation found", level = 3)
-        
-        return guides
-
-
-
-
-
-
-
-
-
-
-
+            return guides
 
 
 def expand_mk_range(mk_str: str) -> list:
@@ -586,7 +579,6 @@ def create_vga_guide_steps_dataframe(guides: list, guides_df: pd.DataFrame) -> p
     document_id = guides_df["DOCUMENT_ID"].iloc[0]
 
     for g_idx,guide in enumerate(guides):
-
         guide_id = find_guide_ID_from_name(guides_df = guides_df, 
                 guide_name = extract_guide_name_from_text(guide["text"]))
 
@@ -687,11 +679,153 @@ def create_vga_guide_substeps_dataframe(guides: list, guides_df: pd.DataFrame) -
     return substeps_df
     
 
+def create_wind_turbine_dataframe(guides_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    A function which creates the dataframe which is written to the database.
+    Each row corresponds to a wind turbine model.
+
+    The dataframe contains the following columns:
+        - WIND_TURBINE_ID: The ID of the wind turbine model
+        - WIND_TURBINE_NAME: The name of the wind turbine model
+        - SIZE: The size of the wind turbine model (V105, V112, V117, V126, V136)
+        - POWER: The generation of the wind turbine model (3.3-4.2MW)
+        - MK_VERSION: The generation of the wind turbine model (3.3-4.2MW)
+    """
+    names = []
+    sizes = []
+    powers = []
+    mk_versions = []
+    for idx, row in guides_df.iterrows():
+        row_string = guides_df.at[idx, "TURBINE_MODELS"]
+        row_list = row_string.split(" | ")
+        for model in row_list:
+            if model == "":
+                continue
+            size = model.split(" ")[0]
+            power = model.split(" ")[1]
+            mk_version = model.split(" ")[2]
+            names.append(model)
+            sizes.append(size)
+            powers.append(power)
+            mk_versions.append(mk_version)
+
+    wind_turbine_df = pd.DataFrame({
+        "TURBINE_NAME": names,
+        "SIZE": sizes,
+        "POWER": powers,
+        "MK_VERSION": mk_versions
+    })
+    
+    wind_turbine_df.drop_duplicates(subset=["TURBINE_NAME"], inplace=True)
+    wind_turbine_df.reset_index(drop=True, inplace=True)
+
+    return wind_turbine_df
+
+
+def create_link_dataframe__guide_id__turbine_id()-> pd.DataFrame:
+    """
+    A function which creates a linking dataframe which is written to the database.
+    Each row corresponds to a link between a guide from VGA_GUIDES and a wind turbine model from WIND_TURBINES.
+    The dataframe contains the following columns:
+        - GUIDE_ID: The ID of the guide (foreign key)
+        - TURBINE_ID: The ID of the wind turbine model (foreign key)
+    """
+    turbine_df = get_table(table_name = "WIND_TURBINES")
+    guides_df = get_table(table_name = "VGA_GUIDES")
+
+    rows = []
+    for i, row in guides_df.iterrows():
+        turbine_models = row["TURBINE_MODELS"].split(" | ")
+        for model in turbine_models:
+            if model == "":
+                continue
+            turbine_id = turbine_df[turbine_df["TURBINE_NAME"] == model]["TURBINE_ID"].values[0]
+            rows.append({
+                "GUIDE_ID": row["GUIDE_ID"],
+                "TURBINE_ID": turbine_id
+            })
+
+    link_df = pd.DataFrame(rows)
+    return link_df
+
+    
+def create_link_dataframe__step_id__dms_no(guides: dict )-> pd.DataFrame:
+    """
+    A function which creates a linking dataframe which is written to the database.
+    Each row corresponds to a link between a step from VGA_GUIDE_STEPS and a DMS No. from DMS_NO.
+    The dataframe contains the following columns:
+        - STEP_ID: The ID of the step (foreign key)
+        - DMS_NO: The DMS No. (potential key to Documents table)
+    """
+    steps_df = get_table(table_name = "VGA_GUIDE_STEPS")
+
+    rows = []
+    for i, row in steps_df.iterrows():
+        guide_id = row["GUIDE_ID"]  # used for the database relation
+        guide_number = row["GUIDE_NUMBER"] # used for indexing in the guides dict
+        step_number = row["STEP"] # use for indexing in the guides dict
+        if step_number == 0:
+            continue
+        dms_no_list = guides[guide_number]["steps"][step_number]["DMS No."] # a list of dicts
+        for dms_no_entry in dms_no_list:
+            rows.append({
+                "GUIDE_ID": row["GUIDE_ID"], # Might be useful for extracting the DMS_NO pr. guide.
+                "GUIDE_STEP_ID": row["GUIDE_STEP_ID"],
+                "DMS_NO": dms_no_entry["DMS No."],
+                "DESCRIPTION": dms_no_entry["Description"],
+                "HYPERLINK": dms_no_entry["hyperlink"]
+            })
+
+    link_df = pd.DataFrame(rows)
+    link_df.drop_duplicates(subset=["GUIDE_STEP_ID", "DMS_NO"], inplace=True)
+    link_df.reset_index(drop=True, inplace=True)
+
+    return link_df
+
+
+def cache_guides(guides: dict):
+    log(f"Caching parsed guides dict to  data/Vestas_RTP/Cache", level = 1)
+    with open("data\\Vestas_RTP\\Cache\\vga_guides.pickle", "wb") as file:
+        pickle.dump(guides, file)
+
+
+def load_cached_guides():
+    with open("data\\Vestas_RTP\\Cache\\vga_guides.pickle", "rb") as file:
+        guides = pickle.load(file)
+    log(f"Loaded guides dict from cache", level = 1)
+    return guides
+
+
 if __name__ == "__main__":
     
     file_path = "data\\Vestas_RTP\\Documents\\VGA_guides\\No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf"
     guides = extract_vga_guide(file_path)
 
-    guides_df = get_table(table_name = "VGA_GUIDES")
+    # guides_df = get_table(table_name = "VGA_GUIDES")
+    # print("guides_df:")
+    # print(guides_df.head())
+    # print("\n")
+
+    # turbine_df = create_wind_turbine_dataframe(guides_df = guides_df)
+    # create_wind_turbine_table()
+    # write_to_table(df = turbine_df, table_name = "WIND_TURBINES")
+
+    # turbine_link_df = create_link_dataframe__guide_id__turbine_id()
+    # create_link_table__guide_id__turbine_id()
+    # write_to_table(df = turbine_link_df, table_name = "LINK_GUIDE_TURBINE")
+
+    # dms_no_link_df = create_link_dataframe__step_id__dms_no(guides = guides)
+    # create_link_table__step_id__dms_no()
+    # write_to_table(df = dms_no_link_df, table_name = "LINK_STEP_DMS")
+
     # steps_df = create_vga_guide_steps_dataframe(guides = guides, guides_df = guides_df)
+    # print("steps_df:")
+    # print(steps_df.head())
+    # print("\n")
+    
+    # substeps_df = create_vga_guide_substeps_dataframe(guides = guides, guides_df = guides_df)
+    # print("substeps_df:")
+    # print(substeps_df.head())
+    # print("\n")
+
 

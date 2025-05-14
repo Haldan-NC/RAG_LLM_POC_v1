@@ -58,6 +58,34 @@ def get_file_age_days(file_path: str) -> int:
     return file_age.days
 
 
+def check_cache_exists(file_path) -> bool:
+    """
+    Check if the VGA guide exists in the database.
+    Args:
+        file_path (str): Path to the PDF file.
+    Returns:
+        bool: True if the guide exists, False otherwise.
+    """
+    # Creating cache just incase it doesn't exist
+    create_cache_dir()
+    # check if the file is older than 7 days
+    if os.path.exists(file_path):
+        age = get_file_age_days(file_path)
+        if age <= 7:
+            return True
+    return False
+
+
+def create_cache_dir() -> str:
+    """
+    Create a cache directory if it doesn't exist.
+    Returns:
+        str: Path to the cache directory.
+    """
+    cache_dir = "data\\Vestas_RTP\\Cache"
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir)
+
 
 class SuppressStderr:
     """

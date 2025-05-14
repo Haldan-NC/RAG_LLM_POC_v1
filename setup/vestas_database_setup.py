@@ -108,7 +108,7 @@ def process_vga_guide() -> None:
     for index, row in document_id_with_vga_guide.iterrows():
         document_id = row["DOCUMENT_ID"]
         file_path = row["FILE_PATH"]
-        guides = extract_vga_guide(file_path = file_path, document_id = document_id)
+        guides = extract_vga_guide(file_path = file_path)
 
         guides_df = create_vga_guide_dataframe(guides = guides, document_id = document_id)
         write_to_table(df = guides_df, table_name="VGA_GUIDES")
@@ -125,6 +125,26 @@ def process_vga_guide() -> None:
         write_to_table(df = substeps_df, table_name="VGA_GUIDE_SUBSTEPS")
         # Creating embeddings for the text content of each substep. Some of them are empty strings.
         create_embeddings_on_chunks(chunks_col = "TEXT", table_name = "VGA_GUIDE_SUBSTEPS")
+
+        # Creates a table which links between the VGA guide steps and the DMS No. which will appear in the Documents table.
+        dms_no_link_df = create_link_dataframe__step_id__dms_no(guides = guides)
+        create_link_table__step_id__dms_no()
+        write_to_table(df = dms_no_link_df, table_name = "LINK_STEP_DMS")
+
+
+def create_wind_turbine_tables() -> None:
+    """
+    Creates the wind turbine tables and the links between the VGA guides and the wind turbines.
+    The wind turbine tables should potentially be created in a different manner in the future.
+    """
+    guides_df = get_table(table_name = "VGA_GUIDES")
+    turbine_df = create_wind_turbine_dataframe(guides_df = guides_df)
+    create_wind_turbine_table()
+    write_to_table(df = turbine_df, table_name = "WIND_TURBINES")
+
+    turbine_link_df = create_link_dataframe__guide_id__turbine_id()
+    create_link_table__guide_id__turbine_id()
+    write_to_table(df = turbine_link_df, table_name = "LINK_GUIDE_TURBINE")
 
 
 
@@ -162,6 +182,7 @@ def create_vestas_unified_chunk_table() -> None:
                                         "STEP": "STEP_OR_INDEX"}, inplace = True)
     vga_guide_df["ORIGIN_TABLE"] = "VGA_GUIDE_STEPS"
     dataframes_to_be_concatenated.append(vga_guide_df)
+
 
     # Iterate through the rows and create Chunk size column
     for df in dataframes_to_be_concatenated:
@@ -203,8 +224,6 @@ def create_vestas_unified_chunk_table() -> None:
     create_embeddings_on_chunks(chunks_col = "TEXT", table_name = "UNION_CHUNKS")
 
 
-
-
 if __name__ == "__main__":
 
     # Creating the database and schema
@@ -216,9 +235,6 @@ if __name__ == "__main__":
     # Create chunked tables
     large_chunks_df, small_chunks_df = create_chunked_tables()
 
-    # # Create sections table (Not implemented for Vestas / Serves as a placeholder)
-    # sections_df = create_vestas_sections_table()
-
     # # Create Images table
     images_df = create_vestas_images_table()
 
@@ -227,3 +243,6 @@ if __name__ == "__main__":
 
     # Create a unified table for all chunks
     create_vestas_unified_chunk_table()
+
+    # Create wind turbine tables and links
+    create_wind_turbine_tables()
