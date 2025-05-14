@@ -48,6 +48,17 @@ def get_log_config():
     return cfg
 
 
+def get_file_age_days(file_path: str) -> int:
+    """
+    Get the age of a file in days
+    """
+    file_mod_time = os.path.getmtime(file_path)
+    file_mod_time = datetime.fromtimestamp(file_mod_time)
+    file_age = datetime.now() - file_mod_time
+    return file_age.days
+
+
+
 class SuppressStderr:
     """
     A class to suppress stderr output found when parsing PDFs with pdfplumber.
