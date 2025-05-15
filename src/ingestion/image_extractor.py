@@ -9,6 +9,7 @@ import cv2
 from shapely.geometry import box
 from shapely.ops import unary_union
 import sys
+import pytesseract
 
 sys.path.append("..\\.")  
 sys.path.append("..\\..\\.") 
@@ -38,6 +39,44 @@ def render_pdf_to_images(pdf_path: str, zoom: float = 2.0) -> list:
         images.append({'page_number':i+1,'image':img})
     return images
 
+
+def render_pdf_page_to_image(file_path: str, real_page_num: int, zoom: float = 2.0) -> Image.Image:
+    """
+    Renders a specific page of a PDF file to an image.
+    Args:
+        pdf_path (str): Path to the PDF file.
+        page_num (int): Page number to render.
+        zoom (float): Zoom factor for rendering.
+    Returns:
+        Image.Image: Rendered image of the specified page.
+    """
+    doc = fitz.open(file_path)
+    page = doc.load_page(page_num-1)
+    pix = page.get_pixmap(matrix=fitz.Matrix(zoom,zoom))
+    img = Image.frombytes('RGB', [pix.width,pix.height], pix.samples)
+    return img
+
+
+def crop_and_rotate_bottom_right(image: Image.Image) -> Image.Image:
+    """
+    Crop bottom-right 5% x 50% of the image and rotate it 90° clockwise.
+    This is used in the document metadata extraction process. 
+    Could be improved to be more genereal.
+    """
+    w, h = image.size
+    crop_box = (int(w * 0.95), int(h * 0.5), w, h)
+    return image.crop(crop_box).transpose(Image.ROTATE_270)
+
+
+def ocr_on_side_label_vestas_page(file_path: str) -> str:
+    """
+    Performs OCR on the side label of a Vestas PDF page.
+    """
+    image = render_pdf_page_to_image(file_path = file_path, real_page_num = 1)
+    cropped = crop_and_rotate_bottom_right(image)
+    text = pytesseract.image_to_string(cropped, lang="eng")
+
+    return text
 
 
 def detect_image_regions(page_image: Image.Image, buffer:int=0, min_size:int=70, threshold:int=240) -> list:

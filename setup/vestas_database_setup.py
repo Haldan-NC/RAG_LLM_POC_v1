@@ -47,8 +47,6 @@ def create_vestas_document_table() -> pd.DataFrame:
         pd.DataFrame: The documents DataFrame under the assumption the table was created successfully.
     """
     pdf_files_path = "data\\Vestas_RTP\\Documents\\Documents"
-    document_rows = []
-    conn,cursor = get_cursor()
     
     documents_df = get_documents_table()
     if type(documents_df) == pd.DataFrame:
@@ -232,17 +230,21 @@ if __name__ == "__main__":
     # Create a table for the documents
     documents_df = create_vestas_document_table()
 
-    # Create chunked tables
-    large_chunks_df, small_chunks_df = create_chunked_tables()
+    # # Create chunked tables
+    # large_chunks_df, small_chunks_df = create_chunked_tables()
 
     # # Create Images table
-    images_df = create_vestas_images_table()
+    # images_df = create_vestas_images_table()
 
     # Extract VGA Guide (seperate parser from other documents)
-    process_vga_guide()
+    # process_vga_guide()
 
     # Create a unified table for all chunks
+<<<<<<< HEAD
     create_vestas_unified_chunk_table()
 
     # Create wind turbine tables and links
     create_wind_turbine_tables()
+=======
+    # create_vestas_unified_chunk_table()
+>>>>>>> feature/document_parser_other_documents

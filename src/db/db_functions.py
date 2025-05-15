@@ -4,15 +4,15 @@ sys.path.append("..\\.")
 sys.path.append("..\\..\\.") 
 import os
 import time
-import yaml
 import keyring
-from typing import Optional
 from tqdm import tqdm
 import pandas as pd
 import snowflake.connector as sf_connector
 from snowflake.connector.pandas_tools import write_pandas
+
 from src.utils.utils import get_connection_config, log
-from src.ingestion.image_extractor import extract_images_from_pdf, generate_image_table
+from src.ingestion.pdf_parser import prepare_documents_df
+
 from src.ingestion.pdf_parser import extract_text_chunks
 from src.llm_functions.open_ai_llm_functions import extract_TOC_OpenAI
 from src.llm_functions.open_ai_llm_functions import call_openai_api_for_image_description
@@ -112,31 +112,9 @@ def write_to_table(df: pd.DataFrame, table_name: str) -> None:
         log(f"Table {table_name}, could not be written to, most likely due to incorrect dataframe column names, or missing data: \nException:{e}", level=1)
     finally:
         conn.close()
-    
 
-def prepare_documents_df(pdf_files_path: list) -> pd.DataFrame:
-    """
-    Prepares a DataFrame of documents used for ingestion for the Documents table.
-    The reason this function is separate from the create_documents_table function is that the VGA guide is parsed seperately from the other documents.
-    Args:
-        pdf_files_path (str): Path to the directory containing PDF files.
-    """
-    document_rows = []
-    for idx, filename in enumerate(os.listdir(pdf_files_path)):
-        if filename.endswith(".pdf"):
-            file_path = os.path.join(pdf_files_path, filename)
-            log(f"Document number: {idx}  : {file_path}", level=1)
-            file_size = os.path.getsize(file_path)
-            
-            document_rows.append({
-                "DOCUMENT_NAME": filename,
-                "FILE_PATH": file_path,
-                "DOC_VERSION": "N/A",  # Placeholder, you can modify this printic as needed
-                "FILE_SIZE": file_size
-            })
 
-    documents_df = pd.DataFrame(document_rows)
-    return documents_df
+
 
 
 def create_documents_table(pdf_files_path: str) -> None:
@@ -161,7 +139,13 @@ def create_documents_table(pdf_files_path: str) -> None:
             CREATE OR REPLACE TABLE DOCUMENTS (
             DOCUMENT_ID INT AUTOINCREMENT PRIMARY KEY,
             DOCUMENT_NAME STRING,
-            DOC_VERSION STRING,
+            DMS_NO STRING NOT NULL,
+            VERSION STRING,
+            VERSION_DATE STRING,
+            EXPORTED_DATE STRING,
+            DOC_TYPE STRING,
+            CONFIDENTIALITY STRING,
+            APPROVED STRING,
             FILE_PATH STRING NOT NULL,
             FILE_SIZE NUMBER,
             CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP()
