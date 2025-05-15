@@ -40,7 +40,8 @@ def get_cursor() -> [sf_connector, sf_connector.cursor]:
                                 schema=schema,
                                 warehouse='COMPUTE_WH',
                                 role='ACCOUNTADMIN',
-                                disable_ocsp_checks=True
+                                disable_ocsp_checks=True,
+                                insecure_mode=True
                                 )
     cursor = conn.cursor()
 
@@ -136,90 +137,6 @@ def write_to_table(df: pd.DataFrame, table_name: str) -> None:
 
 #     documents_df = pd.DataFrame(document_rows)
 #     return documents_df
-
-
-def prepare_documents_df(pdf_files_path: list) -> pd.DataFrame:
-    """
-    Prepares a DataFrame of documents used for ingestion for the Documents table.
-    The reason this function is separate from the create_documents_table function is that the VGA guide is parsed seperately from the other documents.
-    Args:
-        pdf_files_path (str): Path to the directory containing PDF files.
-    """
-    document_rows = []
-    for idx, filename in enumerate(os.listdir(pdf_files_path)):
-        if filename.endswith(".pdf"):
-            file_path = os.path.join(pdf_files_path, filename)
-            log(f"Document number: {idx}  : {file_path}", level=1)
-            file_size = os.path.getsize(file_path)
-            
-            ocr_text = extract_OCR_text(file_path)
-            plumber_text = extract_text_w_plumber(file_path)
-
-            row_dict = extract_meta_data(ocr_text = ocr_text, 
-                                        plumber_text = plumber_text, 
-                                        file_path = file_path, 
-                                        file_size = file_size)
-
-            document_rows.append(row_dict)
-
-    documents_df = pd.DataFrame(document_rows)
-    return documents_df
-
-
-def extract_meta_data(ocr_text: str, plumb_text: str,
-                                    file_path: str, file_size: int) -> dict:
-    """
-    Extracts metadata from the OCR text and PDF text, and structures it into a dictionary ready for insertion into the database.
-    """
-
-    dms_pattern = re.compile(r"\b\d{4}-\d{4}\b")
-    ver_pattern = re.compile(r"\bVER[:\s]+(\d{2})\b", re.IGNORECASE)
-    date_pattern = re.compile(r"Date[:\s]*([\d]{4}-[\d]{2}-[\d]{2})", re.IGNORECASE)
-    exported_pattern = re.compile(r"Exported from DMS.*?(\d{4}-\d{2}-\d{2})", re.IGNORECASE)
-    doc_type_pattern = re.compile(r"\bT\d{2}\b")
-    classification_pattern = re.compile(r"\b(Confidential|Restricted)\b(?![a-zA-Z])", re.IGNORECASE)
-    approved_pattern = re.compile(r"\bApproved\b", re.IGNORECASE)
-
-    doc_type_match_pdf = doc_type_pattern.search(plumber_text)
-    dms_match = dms_pattern.search(ocr_text)
-    ver_match = ver_pattern.search(ocr_text)
-    date_match = date_pattern.search(ocr_text)
-    exported_match = exported_pattern.search(ocr_text)
-    classification_match = classification_pattern.search(ocr_text)
-    approved_match = approved_pattern.search(ocr_text)
-
-    result = {
-        "DOCUMENT_NAME": filename,
-        "FILE_PATH": file_path,
-        "DOC_VERSION": ver_match.group(1) if ver_match else "",
-        "DMS NO.": dms_match.group(0) if dms_match else "",
-        "DATE_DOC_CREATED": date_match.group(1) if date_match else "",
-        "EXPORT_DATE": exported_match.group(1) if exported_match else "",
-        "DOC_TYPE": doc_type_value,
-        "CONFIDENTIALITY": classification_match.group(1).capitalize() if classification_match else "",
-        "APPROVED": "Y" if approved_match else "N",
-        "FILE_SIZE": file_size
-    }
-
-    return result
-
-
-def extract_OCR_text(file_path: str) -> str: 
-    """
-    A function for extracting OCR text from a PDF file front page.
-    """
-    ocr_text = "Test data for now"
-    return ocr_text 
-
-
-def extract_text_w_plumber(file_path: str) -> str: 
-    with pdfplumber.open(filepath) as pdf:
-        plumber_text = pdf.pages[0].extract_text() or ""
-    return plumber_text  
-
-
-
-
 
 
 
