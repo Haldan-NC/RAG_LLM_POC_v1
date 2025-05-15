@@ -269,7 +269,7 @@ def add_dms_no_to_current_guide(current_guide: dict, dms_no_list: list, real_pag
     
     Known issue 1:
     The given list of tables which is iterated over does not nest the DMS No. table.
-    What that means, is that if two DMS No. tables are on the same page, the function will add both the DMS No. tables to both steps.
+    What that means, is that if two DMS No. tables are on the same page, and there are 2 steps on the same page, the function will add both the DMS No. tables to both steps.
     Page 77 (step 22 and 23) is an example of this.
 
     Known issue 2:
