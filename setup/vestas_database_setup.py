@@ -205,7 +205,10 @@ def create_vestas_unified_chunk_table() -> None:
 
 
 
+
 if __name__ == "__main__":
+    
+ 
 
     # Creating the database and schema
     create_vestas_schema_and_tables()
@@ -213,13 +216,14 @@ if __name__ == "__main__":
     # Create a table for the documents
     documents_df = create_vestas_document_table()
 
+
     # Create chunked tables
     large_chunks_df, small_chunks_df = create_chunked_tables()
 
-    # # Create sections table (Not implemented for Vestas / Serves as a placeholder)
-    # sections_df = create_vestas_sections_table()
+    # Create sections table (Not implemented for Vestas / Serves as a placeholder)
+    sections_df = create_vestas_sections_table()
 
-    # # Create Images table
+    # Create Images table
     images_df = create_vestas_images_table()
 
     # Extract VGA Guide (seperate parser from other documents)

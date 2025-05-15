@@ -35,14 +35,32 @@ def convert_to_abs_path(rel_path: str) -> str:
 
 
 def get_connection_config():
-    # Load config
+    """
+    Loads and returns the Snowflake connection configuration from a YAML file.
+
+    The YAML file is expected to be located at:
+        ../../config/connection_config.yaml
+    relative to the script's directory.
+
+    Returns:
+        dict: A dictionary containing the connection configuration parameters.
+    """
     with open(os.path.join(os.path.dirname(__file__), '..\\..', 'config\\connection_config.yaml'), 'r') as f:
         cfg = yaml.safe_load(f)
     return cfg
 
 
 def get_log_config():
-    # Load config
+    """
+    Loads and returns the logging configuration from a YAML file.
+
+    The YAML file is expected to be located at:
+        ../../config/log_config.yaml
+    relative to the script's directory.
+
+    Returns:
+        dict: A dictionary containing the logging configuration settings.
+    """
     with open(os.path.join(os.path.dirname(__file__), '..\\..', 'config\\log_config.yaml'), 'r') as f:
         cfg = yaml.safe_load(f)
     return cfg
