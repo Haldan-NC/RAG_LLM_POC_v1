@@ -109,7 +109,7 @@ def write_to_table(df: pd.DataFrame, table_name: str) -> None:
         )
         log(f"Success: {success}, Chunks: {nchunks}, Rows: {nrows}, Table Name: {table_name}", level=1)
     except Exception as e:
-        log(f"Table {table_name}, could not be written to:", level=1)
+        log(f"Table {table_name}, could not be written to, most likely due to incorrect dataframe column names, or missing data: \nException:{e}", level=1)
     finally:
         conn.close()
     
@@ -171,6 +171,105 @@ def create_documents_table(pdf_files_path: str) -> None:
         write_to_table(df = documents_df, table_name="DOCUMENTS")
     except Exception as e:
         log(f"Table DOCUMENTS, could not be created:", level=1)
+    finally:
+        conn.close()
+
+
+def create_wind_turbine_table() -> None:
+    """
+    Creates a Snowflake table for wind turbines. The table is created if it does not exist.
+    """
+    conn, cursor = get_cursor()
+    cfg = get_connection_config()
+    database = cfg['snowflake']['vestas']['database']
+    schema = cfg['snowflake']['vestas']['schema']
+
+    try: 
+        cursor.execute("""
+            CREATE OR REPLACE TABLE WIND_TURBINES (
+            TURBINE_ID INT AUTOINCREMENT PRIMARY KEY,
+            TURBINE_NAME STRING,
+            SIZE STRING,
+            POWER STRING,
+            MK_VERSION STRING,
+            CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP()
+            );
+        """)
+        time.sleep(1) 
+    except Exception as e:
+        log(f"Table WIND_TURBINES, could not be created:", level=1)
+        log(f"Exception: {e}", level=1)
+    finally:
+        conn.close()
+
+
+def create_link_table__guide_id__turbine_id() -> None:
+    """
+    Creates a Snowflake table for the link between guides and wind turbines. The table is created if it does not exist.
+    """
+    conn, cursor = get_cursor()
+    cfg = get_connection_config()
+    database = cfg['snowflake']['vestas']['database']
+    schema = cfg['snowflake']['vestas']['schema']
+
+    try: 
+        cursor.execute("""
+            CREATE OR REPLACE TABLE LINK_GUIDE_TURBINE (
+            LINK_ID INT AUTOINCREMENT PRIMARY KEY,
+            GUIDE_ID INT NOT NULL,
+            TURBINE_ID INT NOT NULL,
+            CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
+
+            CONSTRAINT fk_guide
+                FOREIGN KEY (GUIDE_ID)
+                REFERENCES VGA_GUIDES(GUIDE_ID),
+
+            CONSTRAINT fk_turbine
+                FOREIGN KEY (TURBINE_ID)
+                REFERENCES WIND_TURBINES(TURBINE_ID)
+            );
+        """)
+        time.sleep(1) 
+    except Exception as e:
+        log(f"Table LINK_GUIDE_TURBINE, could not be created:", level=1)
+        log(f"Exception: {e}", level=1)
+    finally:
+        conn.close()
+
+
+def create_link_table__step_id__dms_no() -> None:
+    """
+    Creates a Snowflake table for the link between guides and wind turbines. The table is created if it does not exist.
+    """
+    conn, cursor = get_cursor()
+    cfg = get_connection_config()
+    database = cfg['snowflake']['vestas']['database']
+    schema = cfg['snowflake']['vestas']['schema']
+
+    try: 
+        cursor.execute("""
+            CREATE OR REPLACE TABLE LINK_STEP_DMS (
+            LINK_ID INT AUTOINCREMENT PRIMARY KEY,
+            GUIDE_ID INT NOT NULL,
+            GUIDE_STEP_ID INT NOT NULL,
+            DMS_NO STRING,
+            DESCRIPTION STRING,
+            HYPERLINK STRING,
+            CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
+
+            CONSTRAINT fk_guide
+                FOREIGN KEY (GUIDE_ID)
+                REFERENCES VGA_GUIDES(GUIDE_ID),
+
+            CONSTRAINT fk_guide_step
+                FOREIGN KEY (GUIDE_STEP_ID)
+                REFERENCES VGA_GUIDE_STEPS(GUIDE_STEP_ID)
+            );
+        """)
+        time.sleep(1) 
+    except Exception as e:
+        log(f"Table LINK_STEP_DMS, could not be created:", level=1)
+        log(f"Exception: {e}", level=1)        
     finally:
         conn.close()
 
