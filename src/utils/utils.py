@@ -6,7 +6,7 @@ import time
 import os
 import yaml
 import keyring
-
+import re
 
 def log(message: str, level: int) -> None:
     """
@@ -60,4 +60,12 @@ class SuppressStderr:
         sys.stderr.close()
         sys.stderr = self._original_stderr
 
+
+def match(pattern: re.Pattern, text: str, group_index:int=0, capitalize:bool=False):
+    """Uses a regex pattern in the given text and returns the matched group."""
+    match = pattern.search(text)
+    if match:
+        value = match.group(group_index)
+        return value.capitalize() if capitalize else value
+    return None
 

@@ -47,7 +47,6 @@ def create_vestas_document_table() -> pd.DataFrame:
         pd.DataFrame: The documents DataFrame under the assumption the table was created successfully.
     """
     pdf_files_path = "data\\Vestas_RTP\\Documents\\Documents"
-    document_rows = []
     
     documents_df = get_documents_table()
     if type(documents_df) == pd.DataFrame:
