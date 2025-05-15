@@ -39,7 +39,9 @@ def get_cursor() -> [sf_connector, sf_connector.cursor]:
                                 database=database,
                                 schema=schema,
                                 warehouse='COMPUTE_WH',
-                                role='ACCOUNTADMIN')
+                                role='ACCOUNTADMIN',
+                                disable_ocsp_checks=True
+                                )
     cursor = conn.cursor()
 
     return conn, cursor
