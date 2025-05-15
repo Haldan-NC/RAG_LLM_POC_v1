@@ -15,7 +15,7 @@ from snowflake.connector.pandas_tools import write_pandas
 from src.utils.utils import get_connection_config, log, SuppressStderr
 from src.ingestion.image_extractor import extract_image_data_from_page
 from src.ingestion.pdf_parser import extract_text_chunks
-from llm_functions.open_ai_llm_functions import call_openai_api_for_image_description, extract_TOC_OpenAI
+from src.llm_functions.open_ai_llm_functions import call_openai_api_for_image_description, extract_TOC_OpenAI
 
 def get_cursor() -> Tuple[sf_connector.SnowflakeConnection, sf_connector.cursor.SnowflakeCursor]:
     """

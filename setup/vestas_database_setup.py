@@ -216,7 +216,6 @@ if __name__ == "__main__":
     # Create a table for the documents
     documents_df = create_vestas_document_table()
 
-
     # Create chunked tables
     large_chunks_df, small_chunks_df = create_chunked_tables()
 
@@ -227,7 +226,7 @@ if __name__ == "__main__":
     images_df = create_vestas_images_table()
 
     # Extract VGA Guide (seperate parser from other documents)
-    process_vga_guide()
+    # process_vga_guide()
 
     # Create a unified table for all chunks
-    create_vestas_unified_chunk_table()
+    # create_vestas_unified_chunk_table()
