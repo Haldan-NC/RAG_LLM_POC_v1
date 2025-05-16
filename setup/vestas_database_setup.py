@@ -3,9 +3,11 @@ import sys
 sys.path.append(".")  
 sys.path.append("..\\.")  
 sys.path.append("..\\..\\.")  
+
 import yaml
 import keyring
 import pandas as pd
+
 from src.db.db_functions import *
 from src.db.db_functions import create_chunked_tables, create_sections_table, create_images_table # Purely for the sake of readability
 from src.db.db_functions import get_documents_table, create_documents_table, get_table # Purely for the sake of readability
@@ -14,6 +16,7 @@ from src.utils.utils import log
 from src.ingestion.vga_pdf_parser import extract_vga_guide
 from src.ingestion.vga_pdf_parser import * # All functions from vga_pdf_parser is inside the function process_vga_guide()
 from src.ingestion.image_extractor import delete_all_local_images
+from src.db.dataframe_creator import prepare_images_df
 
 
 def create_vestas_schema_and_tables() -> bool:
@@ -69,7 +72,14 @@ def create_vestas_images_table() -> pd.DataFrame:
         pd.DataFrame: _description_
     """
     image_dest = "data\\Vestas_RTP\\Images"
-    images_df = create_images_table(image_dest)
+    images_df = get_images_table()
+    if type(images_df) == pd.DataFrame:
+        log("Image table already exists. No need to create it again.", level=1)
+    else: 
+        create_images_table()
+        images_df = prepare_images_df(image_dest=image_dest)
+        write_to_table(df = images_df, table_name = "IMAGES")
+        images_df = get_images_table()
 
     return images_df
 
@@ -224,6 +234,7 @@ def create_vestas_unified_chunk_table() -> None:
     create_embeddings_on_chunks(chunks_col = "TEXT", table_name = "UNION_CHUNKS")
 
 
+
 if __name__ == "__main__":
 
     # Drop the database and delete images if they exist, used while debugging.
@@ -239,7 +250,7 @@ if __name__ == "__main__":
     # # Create chunked tables
     large_chunks_df, small_chunks_df = create_chunked_tables()
 
-    # # Create Images table
+    # Create Images table
     images_df = create_vestas_images_table()
 
     # Extract VGA Guide (seperate parser from other documents)
