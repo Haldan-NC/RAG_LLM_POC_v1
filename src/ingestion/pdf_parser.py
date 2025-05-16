@@ -170,7 +170,5 @@ def create_documents_row(filename: str, file_path: str, text: str) -> dict:
     }
 
 
-
-
 if __name__ == "__main__":
     pass

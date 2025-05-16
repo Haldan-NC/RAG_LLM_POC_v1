@@ -45,13 +45,13 @@ def render_pdf_page_to_image(file_path: str, real_page_num: int, zoom: float = 2
     Renders a specific page of a PDF file to an image.
     Args:
         pdf_path (str): Path to the PDF file.
-        page_num (int): Page number to render.
+        real_page_num (int): Page number to render.
         zoom (float): Zoom factor for rendering.
     Returns:
         Image.Image: Rendered image of the specified page.
     """
     doc = fitz.open(file_path)
-    page = doc.load_page(page_num-1)
+    page = doc.load_page(real_page_num-1)
     pix = page.get_pixmap(matrix=fitz.Matrix(zoom,zoom))
     img = Image.frombytes('RGB', [pix.width,pix.height], pix.samples)
     return img
@@ -149,7 +149,6 @@ def extract_images_from_page(page: fitz.Page, page_num: int, image_path: str) ->
     return images_path_list
 
 
-
 def extract_images_from_pdf(pdf_path: str, manual_id: int, output_dir: str, verbose: int=0) -> dict:
     """
     High-level orchestration: render -> detect -> merge -> crop.
@@ -231,6 +230,27 @@ def generate_image_table(documents_df: pd.DataFrame, image_dir: str, all_manuals
     image_df.dropna(inplace=True)
     image_df.reset_index(drop=True, inplace=True)
     return image_df
+
+
+def delete_all_local_images() -> None:
+    """
+    Deletes all images in the specified directory.
+    Args:
+        image_dir (str): Directory containing images to delete.
+    """
+    image_dir = "data\\Vestas_RTP\\Images"
+    for root, dirs, files in os.walk(image_dir):
+        for sub_dirs in dirs:
+            # remove subdirectories
+            sub_dir_path = os.path.join(root, sub_dirs)
+            if os.path.exists(sub_dir_path):
+                for file in os.listdir(sub_dir_path):
+                    file_path = os.path.join(sub_dir_path, file)
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                os.rmdir(sub_dir_path)
+
+    log(f"Deleted all images in {image_dir}", level=1)
 
 
 if __name__ == "__main__":

@@ -8,10 +8,12 @@ import keyring
 import pandas as pd
 from src.db.db_functions import *
 from src.db.db_functions import create_chunked_tables, create_sections_table, create_images_table # Purely for the sake of readability
+from src.db.db_functions import get_documents_table, create_documents_table, get_table # Purely for the sake of readability
 from src.utils.utils import get_connection_config
 from src.utils.utils import log
 from src.ingestion.vga_pdf_parser import extract_vga_guide
 from src.ingestion.vga_pdf_parser import * # All functions from vga_pdf_parser is inside the function process_vga_guide()
+from src.ingestion.image_extractor import delete_all_local_images
 
 
 def create_vestas_schema_and_tables() -> bool:
@@ -224,6 +226,10 @@ def create_vestas_unified_chunk_table() -> None:
 
 if __name__ == "__main__":
 
+    # Drop the database and delete images if they exist, used while debugging.
+    drop_database()
+    delete_all_local_images()
+
     # Creating the database and schema
     create_vestas_schema_and_tables()
 
@@ -231,20 +237,17 @@ if __name__ == "__main__":
     documents_df = create_vestas_document_table()
 
     # # Create chunked tables
-    # large_chunks_df, small_chunks_df = create_chunked_tables()
+    large_chunks_df, small_chunks_df = create_chunked_tables()
 
     # # Create Images table
-    # images_df = create_vestas_images_table()
+    images_df = create_vestas_images_table()
 
     # Extract VGA Guide (seperate parser from other documents)
-    # process_vga_guide()
+    process_vga_guide()
 
     # Create a unified table for all chunks
-<<<<<<< HEAD
     create_vestas_unified_chunk_table()
 
     # Create wind turbine tables and links
     create_wind_turbine_tables()
-=======
-    # create_vestas_unified_chunk_table()
->>>>>>> feature/document_parser_other_documents
+

@@ -11,8 +11,8 @@ import snowflake.connector as sf_connector
 from snowflake.connector.pandas_tools import write_pandas
 
 from src.utils.utils import get_connection_config, log
+from src.ingestion.image_extractor import extract_images_from_pdf, generate_image_table
 from src.ingestion.pdf_parser import prepare_documents_df
-
 from src.ingestion.pdf_parser import extract_text_chunks
 from src.llm_functions.open_ai_llm_functions import extract_TOC_OpenAI
 from src.llm_functions.open_ai_llm_functions import call_openai_api_for_image_description
@@ -120,13 +120,15 @@ def write_to_table(df: pd.DataFrame, table_name: str) -> None:
 def create_documents_table(pdf_files_path: str) -> None:
     """
     Creates a Snowflake table for documents. The table is created if it does not exist.
+    DMS_NO is a unique identifier for each document, which is present at all documents extracted from SAP (correct me if I'm wrong).
+    The VGA guide does not have a DMS_NO on the first page.
     Args:
         pdf_files_path (str): Path to the directory containing PDF files.
     Returns:
         pd.DataFrame: DataFrame containing the documents table.
     """
 
-    conn, cursor = get_cursor()
+    conn, cursor = get_cursor() 
     document_rows = []
     cfg = get_connection_config()
     database = cfg['snowflake']['vestas']['database']
@@ -139,7 +141,7 @@ def create_documents_table(pdf_files_path: str) -> None:
             CREATE OR REPLACE TABLE DOCUMENTS (
             DOCUMENT_ID INT AUTOINCREMENT PRIMARY KEY,
             DOCUMENT_NAME STRING,
-            DMS_NO STRING NOT NULL,
+            DMS_NO STRING, 
             VERSION STRING,
             VERSION_DATE STRING,
             EXPORTED_DATE STRING,
@@ -659,6 +661,25 @@ def populate_image_descriptions(sub_images_df: pd.DataFrame) -> pd.DataFrame:
         conn.close()
 
     return sub_images_df
+
+
+def drop_database() -> None:
+    """
+    Drops the database and all its tables.
+    """
+    conn, cursor = get_cursor()
+    cfg = get_connection_config()
+    database = cfg['snowflake']['vestas']['database']
+    schema = cfg['snowflake']['vestas']['schema']
+
+    try:
+        cursor.execute(f"DROP DATABASE {database};")
+        log(f"Database {database} dropped successfully.", level=1)
+    except Exception as e:
+        log(f"Error dropping database {database}: {e}", level=1)
+    finally:
+        conn.close()
+
 
 
 
