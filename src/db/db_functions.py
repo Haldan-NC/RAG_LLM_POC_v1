@@ -130,10 +130,6 @@ def create_documents_table(pdf_files_path: str) -> None:
 
     conn, cursor = get_cursor() 
     document_rows = []
-    cfg = get_connection_config()
-    database = cfg['snowflake']['vestas']['database']
-    schema = cfg['snowflake']['vestas']['schema']
-    
     documents_df = prepare_documents_df(pdf_files_path)
 
     try: 
@@ -167,8 +163,6 @@ def create_wind_turbine_table() -> None:
     """
     conn, cursor = get_cursor()
     cfg = get_connection_config()
-    database = cfg['snowflake']['vestas']['database']
-    schema = cfg['snowflake']['vestas']['schema']
 
     try: 
         cursor.execute("""
@@ -195,8 +189,6 @@ def create_link_table__guide_id__turbine_id() -> None:
     """
     conn, cursor = get_cursor()
     cfg = get_connection_config()
-    database = cfg['snowflake']['vestas']['database']
-    schema = cfg['snowflake']['vestas']['schema']
 
     try: 
         cursor.execute("""
@@ -229,8 +221,6 @@ def create_link_table__step_id__dms_no() -> None:
     """
     conn, cursor = get_cursor()
     cfg = get_connection_config()
-    database = cfg['snowflake']['vestas']['database']
-    schema = cfg['snowflake']['vestas']['schema']
 
     try: 
         cursor.execute("""
@@ -267,8 +257,6 @@ def create_sections_table() -> None:
 
     conn, cursor = get_cursor()
     cfg = get_connection_config()
-    database = cfg['snowflake']['vestas']['database']
-    schema = cfg['snowflake']['vestas']['schema']
     sections_df_list = []
 
     # No max columns for pandas 
@@ -326,8 +314,6 @@ def create_images_table(image_dest: str) -> None:
 
     else: 
         cfg = get_connection_config()
-        database = cfg['snowflake']['vestas']['database']
-        schema = cfg['snowflake']['vestas']['schema']
         conn, cursor = get_cursor()
         documents_df = get_documents_table()
 
@@ -420,8 +406,6 @@ def create_windowed_chunk_table(table_name: str, chunk_size: int, chunk_overlap:
     documents_df = get_documents_table()
     # Get Config    
     cfg = get_connection_config()
-    database = cfg['snowflake']['vestas']['database']
-    schema = cfg['snowflake']['vestas']['schema']
     
     create_table_sql = f"""
     CREATE OR REPLACE TABLE {table_name} (
@@ -670,7 +654,6 @@ def drop_database() -> None:
     conn, cursor = get_cursor()
     cfg = get_connection_config()
     database = cfg['snowflake']['vestas']['database']
-    schema = cfg['snowflake']['vestas']['schema']
 
     try:
         cursor.execute(f"DROP DATABASE {database};")
@@ -679,8 +662,6 @@ def drop_database() -> None:
         log(f"Error dropping database {database}: {e}", level=1)
     finally:
         conn.close()
-
-
 
 
 if __name__ == "__main__":
