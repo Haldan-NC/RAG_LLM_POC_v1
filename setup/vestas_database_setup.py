@@ -16,7 +16,7 @@ from src.utils.utils import log
 from src.ingestion.vga_pdf_parser import extract_vga_guide
 from src.ingestion.vga_pdf_parser import * # All functions from vga_pdf_parser is inside the function process_vga_guide()
 from src.ingestion.image_extractor import delete_all_local_images
-from src.db.dataframe_creator import prepare_images_df
+from src.db.dataframe_creator import prepare_images_df, prepare_documents_df
 
 
 def create_vestas_schema_and_tables() -> bool:
@@ -263,4 +263,5 @@ if __name__ == "__main__":
 
     # Create wind turbine tables and links
     create_wind_turbine_tables()
+
 
