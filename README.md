@@ -71,6 +71,17 @@ This proof-of-concept establishes a structured foundation for ongoing developmen
      - User name: `api_key`  
      - Password: `<your_openai_api_key>`
 
+6. **Set Up Pytesseract (OCR for Image Text Extraction)**
+   The codebase uses `pytesseract`, a Python wrapper for Google's Tesseract-OCR engine, to extract text from images.
+   Since pytesseract is just a wrapper — you need to install the actual Tesseract engine. 
+
+   **Install Tesseract-OCR:**
+   - Download the installer from [Tesseract at UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki).
+      - Run the installer and note the installation path (e.g., `C:\Users\<NC-intials>\AppData\Local\Programs\Tesseract-OCR`)
+      - Add the Tesseract installation directory to your system’s PATH:
+         - Open System Properties → Environment Variables
+         - Add `C:\Users\<NC-intials>\AppData\Local\Programs\Tesseract-OCR` to the **Path** variable under **System variables**
+
 
 ---
 
