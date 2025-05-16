@@ -14,7 +14,4 @@ snowflake_connector_python==3.14.0
 tqdm==4.67.1
 PyYAML==6.0.2
 pymupdf==1.25.5
-
-
-
- 
+pytesseract==0.3.13
