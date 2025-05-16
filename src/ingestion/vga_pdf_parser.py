@@ -20,11 +20,9 @@ sys.path.append("..\\..\\.")
 from src.utils.utils import get_connection_config, log
 from src.utils.utils import SuppressStderr, check_cache_exists
 from src.ingestion.image_extractor import extract_images_from_page
-from src.db.db_functions import prepare_documents_df, write_to_table, get_documents_table
-from src.db.db_functions import create_vga_guide_table, create_vga_guide_steps_table, create_vga_guide_substeps_table
-from src.db.db_functions import create_wind_turbine_table, create_link_table__guide_id__turbine_id
-from src.db.db_functions import create_link_table__step_id__dms_no
+from src.db.db_functions import write_to_table, get_documents_table
 from src.db.db_functions import get_table
+from src.db.dataframe_creator import prepare_documents_df
 
 
 def string_hardcoded_bandaid(text: str, real_page_num: int) -> str:
@@ -519,6 +517,17 @@ def extract_guide_name_from_text(text: str) -> str:
     return text.replace("Guide Name: ", "").strip().split("\n")[0]
 
 
+def find_guide_ID_from_name(guides_df: pd.DataFrame, guide_name: str) -> int:
+    """
+    Finds the guide ID from the guide name.
+    The guide ID is used to reference the guide in the database.
+    """
+    for i, row in guides_df.iterrows():
+        if row["GUIDE_NAME"] == guide_name:
+            return row["GUIDE_ID"]
+    return None
+
+
 def create_vga_guide_dataframe(guides: list, document_id: int) -> pd.DataFrame:
     """
     A function which creates the dataframe which is written to the database.
@@ -548,16 +557,6 @@ def create_vga_guide_dataframe(guides: list, document_id: int) -> pd.DataFrame:
     guides_df["DOCUMENT_ID"] = document_id
     return guides_df
 
-
-def find_guide_ID_from_name(guides_df: pd.DataFrame, guide_name: str) -> int:
-    """
-    Finds the guide ID from the guide name.
-    The guide ID is used to reference the guide in the database.
-    """
-    for i, row in guides_df.iterrows():
-        if row["GUIDE_NAME"] == guide_name:
-            return row["GUIDE_ID"]
-    return None
 
 
 def create_vga_guide_steps_dataframe(guides: list, guides_df: pd.DataFrame) -> pd.DataFrame:
@@ -801,31 +800,5 @@ if __name__ == "__main__":
     file_path = "data\\Vestas_RTP\\Documents\\VGA_guides\\No communication Rtop - V105 V112 V117 V126 V136 3,3-4,2MW MK3.pdf"
     guides = extract_vga_guide(file_path)
 
-    # guides_df = get_table(table_name = "VGA_GUIDES")
-    # print("guides_df:")
-    # print(guides_df.head())
-    # print("\n")
-
-    # turbine_df = create_wind_turbine_dataframe(guides_df = guides_df)
-    # create_wind_turbine_table()
-    # write_to_table(df = turbine_df, table_name = "WIND_TURBINES")
-
-    # turbine_link_df = create_link_dataframe__guide_id__turbine_id()
-    # create_link_table__guide_id__turbine_id()
-    # write_to_table(df = turbine_link_df, table_name = "LINK_GUIDE_TURBINE")
-
-    # dms_no_link_df = create_link_dataframe__step_id__dms_no(guides = guides)
-    # create_link_table__step_id__dms_no()
-    # write_to_table(df = dms_no_link_df, table_name = "LINK_STEP_DMS")
-
-    # steps_df = create_vga_guide_steps_dataframe(guides = guides, guides_df = guides_df)
-    # print("steps_df:")
-    # print(steps_df.head())
-    # print("\n")
-    
-    # substeps_df = create_vga_guide_substeps_dataframe(guides = guides, guides_df = guides_df)
-    # print("substeps_df:")
-    # print(substeps_df.head())
-    # print("\n")
 
 
