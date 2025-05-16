@@ -8,13 +8,13 @@ sys.path.append("..\\..\\.")
 import os
 import re
 
-from src.ingestion.image_extractor import ocr_on_side_label_vestas_page
 from src.utils.utils import log, match, SuppressStderr
 
 
 def extract_text_chunks(file_path: str, manual_id: int, chunk_size: int = 512, chunk_overlap: int = 128) -> pd.DataFrame:
     """
     Extracts text chunks from a PDF file, tracking the page numbers and creating a DataFrame.
+    NOTE: This function needs to be broken down, and the part where the dataframe is created should be moved to the dataframe_creator.py file.
     Args:
         file_path (str): Path to the PDF file.
         manual_id (int): Manual ID for the document.
@@ -80,47 +80,6 @@ def extract_text_chunks(file_path: str, manual_id: int, chunk_size: int = 512, c
 
         df = pd.DataFrame(rows, columns=["DOCUMENT_ID", "PAGE_START_NUMBER", "PAGE_END_NUMBER", "CHUNK_TEXT", "CHUNK_ORDER"])
         return df
-
-
-def prepare_documents_df(pdf_files_path: str) -> pd.DataFrame:
-    """
-    Prepares a DataFrame of documents used for ingestion for the Documents table.
-    The reason this function is separate from the create_documents_table function is that the VGA guide is parsed seperately from the other documents.
-    Args:
-        pdf_files_path (str): Path to the directory containing PDF files.
-    """
-    document_rows = []
-    for idx, filename in enumerate(os.listdir(pdf_files_path)):
-        if filename.lower().endswith(".pdf"):
-            file_path = os.path.join(pdf_files_path, filename)
-            log(f"Document number: {idx}  : {file_path}", level=1)
-
-
-            with SuppressStderr():
-                with pdfplumber.open(file_path) as pdf:
-                    plumber_text = pdf.pages[0].extract_text() or ""
-                
-                plumber_dict = create_documents_row(filename=filename, 
-                                                    file_path = file_path, 
-                                                    text = plumber_text)
-
-                ocr_text = ocr_on_side_label_vestas_page(file_path = file_path)
-
-                ocr_dict = create_documents_row(filename=filename, 
-                                                file_path = file_path, 
-                                                text = ocr_text)
-
-                # Combine the two dictionaries, where we consider the plumber_dict as the main source of truth.
-                for key, item in plumber_dict.items():
-                    if item == None:
-                        if ocr_dict[key] != None:
-                            plumber_dict[key] = ocr_dict[key]
-                plumber_dict["CONFIDENTIALITY"] = plumber_dict["CONFIDENTIALITY"].upper() if plumber_dict["CONFIDENTIALITY"] else None
-
-                document_rows.append(plumber_dict)
-            
-    documents_df = pd.DataFrame(document_rows)
-    return documents_df
 
 
 def extract_metadata_regex_patterns() -> dict:

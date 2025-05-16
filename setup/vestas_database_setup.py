@@ -57,7 +57,9 @@ def create_vestas_document_table() -> pd.DataFrame:
     if type(documents_df) == pd.DataFrame:
         log("Documents table already exists. No need to create it again.", level=1)
     else:
-        create_documents_table(pdf_files_path)
+        create_documents_table()
+        documents_df = prepare_documents_df(pdf_files_path)
+        write_to_table(df = documents_df, table_name="DOCUMENTS")
         documents_df = get_documents_table()
 
     return documents_df
@@ -162,7 +164,7 @@ def create_vestas_unified_chunk_table() -> None:
     """
     Creates a unified table for all text related tables and writes it to the database.
     This function creates a unified dataframe for all text related tables.
-    This dataframe will th
+    TODO: Split this up into smaller functions, such that it matches the documents table and images table process.
 
     Returns:
         pd.DataFrame: The unified chunk DataFrame.

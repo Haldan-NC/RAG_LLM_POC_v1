@@ -14,7 +14,6 @@ from snowflake.connector.pandas_tools import write_pandas
 
 from src.utils.utils import get_connection_config, log, SuppressStderr
 from src.ingestion.image_extractor import extract_image_data_from_page
-from src.ingestion.pdf_parser import prepare_documents_df
 from src.ingestion.pdf_parser import extract_text_chunks
 from src.llm_functions.open_ai_llm_functions import call_openai_api_for_image_description, extract_TOC_OpenAI
 
@@ -153,23 +152,17 @@ def write_to_table(df: pd.DataFrame, table_name: str) -> None:
         conn.close()
 
 
-
-
-
-def create_documents_table(pdf_files_path: str) -> pd.DataFrame:
+def create_documents_table() -> pd.DataFrame:
     """
     Creates a Snowflake table for documents. The table is created if it does not exist.
     DMS_NO is a unique identifier for each document, which is present at all documents extracted from SAP (correct me if I'm wrong).
     The VGA guide does not have a DMS_NO on the first page.
-    Args:
-        pdf_files_path (str): Path to the directory containing PDF files.
+
     Returns:
         pd.DataFrame: DataFrame containing the documents table.
     """
 
     conn, cursor = get_cursor() 
-    document_rows = []
-    documents_df = prepare_documents_df(pdf_files_path)
 
     try: 
         cursor.execute("""
@@ -189,7 +182,6 @@ def create_documents_table(pdf_files_path: str) -> pd.DataFrame:
             );
         """)
         time.sleep(1) 
-        write_to_table(df = documents_df, table_name="DOCUMENTS")
     except Exception as e:
         log_error_table_creation(table_name="DOCUMENTS", e=e)
     finally:
@@ -412,7 +404,8 @@ def create_small_chunks_table() -> pd.DataFrame:
 
 def create_windowed_chunk_table(table_name: str, chunk_size: int, chunk_overlap: int) -> pd.DataFrame:
     """Method for creating a snowflake table for chunks.
-    
+    TODO: Split this function into multiple parts, where the core components are called in vestas_database_setup.py
+
     Args:
         table_name: str, name of table to create
         chunk_size: int, number of characters that should be in a chunk 
@@ -455,9 +448,8 @@ def create_windowed_chunk_table(table_name: str, chunk_size: int, chunk_overlap:
                                 chunk_overlap = chunk_overlap)  # Show first 5 chunks
             chunks_df = pd.concat([chunks_df, tmp_chunked_df], ignore_index=True)
         
-            log(f"Writing the {table_name} DataFrame to Snowflake", level=1)
-        
         # Write the DataFrame to Snowflake
+        log(f"Writing the {table_name} DataFrame to Snowflake", level=1)
         write_to_table(df = chunks_df, table_name = table_name)
     except Exception as e:
         log_error_table_creation(table_name=""+table_name, e=e)
